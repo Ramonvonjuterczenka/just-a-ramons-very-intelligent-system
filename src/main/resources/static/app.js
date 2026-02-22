@@ -107,6 +107,9 @@ async function fetchConfig() {
         ttsSelect.value = config.tts || 'mock';
         updateGeminiKeyVisibility();
         updateVoiceVisibility();
+        if (config.tts && config.tts !== 'browser') {
+            fetchVoicesForTts(config.tts);
+        }
     } catch (e) {
         configStatus.innerText = "CONFIG: ERROR";
     }
@@ -221,14 +224,17 @@ function updateGeminiKeyVisibility() {
     }
 }
 
-ttsSelect.addEventListener('change', updateVoiceVisibility);
+ttsSelect.addEventListener('change', () => {
+    updateVoiceVisibility();
+    if (ttsSelect.value === 'browser') {
+        populateVoices();
+    } else {
+        fetchVoicesForTts(ttsSelect.value);
+    }
+});
 
 function updateVoiceVisibility() {
-    if (ttsSelect.value === 'browser') {
-        voiceGroup.style.display = 'flex';
-    } else {
-        voiceGroup.style.display = 'none';
-    }
+    voiceGroup.style.display = 'flex';
 }
 
 // Web Speech API - Voice loading
@@ -289,12 +295,16 @@ function speakText(text) {
 
 testVoiceBtn.addEventListener('click', (e) => {
     e.preventDefault(); // Prevent accidental form submission if any
-    const selectedVoiceIndex = voiceSelect.value;
-    if (selectedVoiceIndex && availableVoices[selectedVoiceIndex]) {
-        const testPhrase = `Greetings. This is a test of the ${availableVoices[selectedVoiceIndex].name} vocal subsystem.`;
-        speakText(testPhrase);
+    if (ttsSelect.value === 'browser') {
+        const selectedVoiceIndex = voiceSelect.value;
+        if (selectedVoiceIndex && availableVoices[selectedVoiceIndex]) {
+            const testPhrase = `Greetings. This is a test of the ${availableVoices[selectedVoiceIndex].name} vocal subsystem.`;
+            speakText(testPhrase);
+        } else {
+            speakText("Please select a valid voice first.");
+        }
     } else {
-        speakText("Please select a valid voice first.");
+        logMessage('SYS', `Selected Voice: ${voiceSelect.value}. Use the chat input to test audio generation.`);
     }
 });
 
@@ -322,6 +332,33 @@ async function fetchModelsForLlm(llmName) {
         }
     } catch (e) {
         modelSelect.innerHTML = '<option value="" disabled>Error fetching models</option>';
+    }
+}
+
+async function fetchVoicesForTts(ttsName) {
+    voiceSelect.innerHTML = '<option value="" disabled selected>Loading voices...</option>';
+    voiceSelect.disabled = true;
+    try {
+        const res = await fetch(`/api/config/voices?provider=${ttsName}`);
+        const data = await res.json();
+
+        voiceSelect.innerHTML = '';
+        if (data.availableVoices && data.availableVoices.length > 0) {
+            data.availableVoices.forEach(voice => {
+                const opt = document.createElement('option');
+                opt.value = voice;
+                opt.innerText = voice;
+                if (voice === data.activeVoice) {
+                    opt.selected = true;
+                }
+                voiceSelect.appendChild(opt);
+            });
+            voiceSelect.disabled = false;
+        } else {
+            voiceSelect.innerHTML = '<option value="" disabled>No voices found</option>';
+        }
+    } catch (e) {
+        voiceSelect.innerHTML = '<option value="" disabled>Error fetching voices</option>';
     }
 }
 
@@ -357,7 +394,8 @@ saveSettingsBtn.addEventListener('click', async () => {
     const updates = {
         llm: activeLlm,
         tts: activeTts,
-        model: modelSelect.value
+        model: modelSelect.value,
+        voice: voiceSelect.value
     };
     if (activeLlm === 'gemini' && geminiKey) {
         updates.geminiKey = geminiKey;

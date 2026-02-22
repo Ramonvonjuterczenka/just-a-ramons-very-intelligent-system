@@ -98,7 +98,8 @@ public class GeminiLlmProvider implements LlmProvider {
                             Map.of("text", prompt)))));
 
             if (systemPrompt != null && !systemPrompt.trim().isEmpty()) {
-                requestBody.put("system_instruction", Map.of(
+                // Correct JSON field name for Gemini API is 'systemInstruction' (camelCase)
+                requestBody.put("systemInstruction", Map.of(
                         "parts", List.of(
                                 Map.of("text", systemPrompt))));
             }
@@ -124,12 +125,19 @@ public class GeminiLlmProvider implements LlmProvider {
             if (response != null && response.containsKey("candidates")) {
                 List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
                 if (!candidates.isEmpty()) {
-                    Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
-                    List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
-                    return (String) parts.get(0).get("text");
+                    Map<String, Object> candidate = candidates.get(0);
+                    if (candidate.containsKey("content")) {
+                        Map<String, Object> content = (Map<String, Object>) candidate.get("content");
+                        if (content.containsKey("parts")) {
+                            List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
+                            if (!parts.isEmpty() && parts.get(0).containsKey("text")) {
+                                return (String) parts.get(0).get("text");
+                            }
+                        }
+                    }
                 }
             }
-            return "Error: Unexpected response format from Google Gemini.";
+            return "Error: Unexpected response format from Google Gemini: " + httpResponse.body();
         } catch (Exception e) {
             e.printStackTrace();
             return "Error communicating with Google Gemini: " + e.getMessage();

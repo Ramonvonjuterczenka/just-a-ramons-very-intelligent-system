@@ -85,4 +85,8 @@ public class ProviderManager {
     public LlmProvider getLlmProvider(String name) {
         return llmProviders.get(name);
     }
+
+    public TtsProvider getTtsProvider(String name) {
+        return ttsProviders.get(name);
+    }
 }
