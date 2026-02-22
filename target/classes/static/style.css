@@ -1,0 +1,385 @@
+:root {
+    --jarvis-blue: #00d2ff;
+    --jarvis-blue-glow: rgba(0, 210, 255, 0.5);
+    --jarvis-bg: #03080c;
+    --jarvis-dark: #06111a;
+    --jarvis-warning: #ff3333;
+    --jarvis-ok: #33ff33;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Orbitron', sans-serif;
+}
+
+body {
+    background-color: var(--jarvis-bg);
+    color: var(--jarvis-blue);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Background HUD Grid */
+.background-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+        linear-gradient(rgba(0, 210, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 210, 255, 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+    z-index: -1;
+}
+
+/* Top HUD */
+.top-hud {
+    display: flex;
+    justify-content: space-between;
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--jarvis-blue-glow);
+    background: linear-gradient(to bottom, rgba(0, 210, 255, 0.05), transparent);
+    text-shadow: 0 0 10px var(--jarvis-blue);
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+}
+
+.hud-center {
+    font-weight: 700;
+    font-size: 1.5rem;
+    letter-spacing: 5px;
+}
+
+.status-ok {
+    color: var(--jarvis-ok);
+    text-shadow: 0 0 10px var(--jarvis-ok);
+}
+
+/* Center Arc Reactor / Main interaction */
+.center-console {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.arc-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.arc-container:hover {
+    transform: scale(1.05);
+}
+
+.arc-container:active {
+    transform: scale(0.95);
+}
+
+.arc-reactor {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    box-shadow: 0 0 30px var(--jarvis-blue-glow), inset 0 0 30px var(--jarvis-blue-glow);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.arc-reactor.active {
+    box-shadow: 0 0 60px var(--jarvis-blue), inset 0 0 60px var(--jarvis-blue);
+    animation: pulse 1s infinite alternate;
+}
+
+.core {
+    width: 100px;
+    height: 100px;
+    background: radial-gradient(circle, #ffffff 10%, var(--jarvis-blue) 70%, transparent 100%);
+    border-radius: 50%;
+    box-shadow: 0 0 40px #fff;
+    opacity: 0.8;
+}
+
+.arc-reactor.active .core {
+    opacity: 1;
+    box-shadow: 0 0 80px #fff;
+    animation: core-pulse 0.5s infinite alternate;
+}
+
+.ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px dashed var(--jarvis-blue);
+    animation: spin 10s linear infinite;
+    opacity: 0.5;
+}
+
+.outer-ring {
+    width: 180px;
+    height: 180px;
+    animation-duration: 15s;
+    animation-direction: reverse;
+}
+
+.inner-ring {
+    width: 140px;
+    height: 140px;
+    border-style: dotted;
+    animation-duration: 8s;
+}
+
+.status-text {
+    margin-top: 30px;
+    font-size: 1.2rem;
+    letter-spacing: 3px;
+    text-shadow: 0 0 10px var(--jarvis-blue);
+    opacity: 0.8;
+}
+
+/* Text / Log Panel */
+.log-panel {
+    height: 250px;
+    background: rgba(6, 17, 26, 0.8);
+    border-top: 1px solid var(--jarvis-blue-glow);
+    display: flex;
+    flex-direction: column;
+}
+
+.log-header {
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--jarvis-blue-glow);
+    font-size: 0.8rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(to right, rgba(0, 210, 255, 0.1), transparent);
+}
+
+.log-header button {
+    background: transparent;
+    border: 1px solid var(--jarvis-blue);
+    color: var(--jarvis-blue);
+    padding: 3px 10px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    transition: all 0.2s;
+}
+
+.log-header button:hover {
+    background: var(--jarvis-blue);
+    color: var(--jarvis-bg);
+}
+
+.log-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px 20px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.log-msg {
+    margin-bottom: 5px;
+    line-height: 1.4;
+}
+
+.log-msg.user {
+    color: #fff;
+}
+
+.log-msg.jarvis {
+    color: var(--jarvis-blue);
+    text-shadow: 0 0 3px var(--jarvis-blue);
+}
+
+.input-container {
+    display: flex;
+    padding: 10px 20px 20px 20px;
+    gap: 10px;
+}
+
+input[type="text"] {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--jarvis-blue-glow);
+    color: var(--jarvis-blue);
+    padding: 10px 15px;
+    outline: none;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+input[type="text"]:focus {
+    border-color: var(--jarvis-blue);
+    box-shadow: 0 0 10px var(--jarvis-blue-glow);
+}
+
+.input-container button {
+    background: var(--jarvis-blue);
+    color: var(--jarvis-bg);
+    border: none;
+    padding: 0 25px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.input-container button:hover {
+    background: #fff;
+    box-shadow: 0 0 15px var(--jarvis-blue);
+}
+
+
+/* Animations */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes pulse {
+    from {
+        box-shadow: 0 0 40px var(--jarvis-blue-glow), inset 0 0 40px var(--jarvis-blue-glow);
+    }
+
+    to {
+        box-shadow: 0 0 70px var(--jarvis-blue), inset 0 0 70px var(--jarvis-blue);
+    }
+}
+
+@keyframes core-pulse {
+    from {
+        transform: scale(0.95);
+        opacity: 0.8;
+    }
+
+    to {
+        transform: scale(1.05);
+        opacity: 1;
+        box-shadow: 0 0 60px #fff;
+    }
+}
+
+/* Custom Scrollbar for Logs */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 210, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--jarvis-blue-glow);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--jarvis-blue);
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(3, 8, 12, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: rgba(6, 17, 26, 0.95);
+    border: 1px solid var(--jarvis-blue);
+    box-shadow: 0 0 30px var(--jarvis-blue-glow);
+    padding: 30px;
+    width: 400px;
+    max-width: 90%;
+    border-radius: 5px;
+}
+
+.modal-content h2 {
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+    text-shadow: 0 0 5px var(--jarvis-blue);
+    text-align: center;
+    letter-spacing: 2px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-size: 0.8rem;
+    margin-bottom: 8px;
+    color: #ccc;
+}
+
+.form-group select,
+.form-group input {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--jarvis-blue-glow);
+    color: var(--jarvis-blue);
+    padding: 10px;
+    outline: none;
+    font-size: 1rem;
+    transition: all 0.3s;
+}
+
+.form-group select:focus,
+.form-group input:focus {
+    border-color: var(--jarvis-blue);
+    box-shadow: 0 0 10px var(--jarvis-blue-glow);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 30px;
+}
+
+.modal-actions button {
+    background: var(--jarvis-blue);
+    color: var(--jarvis-bg);
+    border: none;
+    padding: 10px 20px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    width: 48%;
+}
+
+.modal-actions button.secondary {
+    background: transparent;
+    border: 1px solid var(--jarvis-blue);
+    color: var(--jarvis-blue);
+}
+
+.modal-actions button:hover {
+    box-shadow: 0 0 15px var(--jarvis-blue);
+    background: #fff;
+    color: var(--jarvis-bg);
+}
