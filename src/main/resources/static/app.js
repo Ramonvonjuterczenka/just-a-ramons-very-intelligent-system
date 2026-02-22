@@ -27,6 +27,7 @@ const testConnResult = document.getElementById('test-conn-result');
 
 // Web Speech API
 let availableVoices = [];
+let recognition; // For wake word detection
 
 // Web Audio API context
 let audioContext;
@@ -421,6 +422,102 @@ saveSettingsBtn.addEventListener('click', async () => {
     }
 });
 
+// Wake Word / Speech Recognition
+function initSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        console.warn("Speech Recognition API not supported in this browser.");
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US'; // Default to English
+
+    recognition.onstart = () => {
+        console.log("Wake word listener started.");
+    };
+
+    recognition.onerror = (event) => {
+        // console.error("Speech recognition error", event.error);
+        if (event.error === 'not-allowed') {
+            logMessage('SYS', 'Microphone access denied.');
+        }
+    };
+
+    recognition.onend = () => {
+        // Auto-restart for continuous listening, unless manually stopped
+        // We use a flag or check 'recognition' object validity
+        if (recognition) {
+            try {
+                recognition.start();
+            } catch (e) {
+                // ignore if already started
+            }
+        }
+    };
+
+    recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            // We look at final results
+            if (event.results[i].isFinal) {
+                const transcript = event.results[i][0].transcript.trim().toLowerCase();
+                // console.log("Heard:", transcript);
+
+                if (transcript.includes("jarvis")) {
+                    // Extract command part
+                    // "hello jarvis what time is it" -> "what time is it"
+                    // "jarvis stop" -> "stop"
+                    const parts = transcript.split("jarvis");
+                    // Take the last part as the command usually? Or everything after first 'jarvis'?
+                    // Let's assume the user says "Jarvis, [command]"
+                    const command = parts.slice(1).join("jarvis").trim();
+
+                    handleWakeWord(command);
+                }
+            }
+        }
+    };
+
+    try {
+        recognition.start();
+    } catch (e) {
+        console.error("Failed to start recognition:", e);
+    }
+}
+
+function handleWakeWord(command) {
+    logMessage('USER', '[Wake Word Detected]');
+
+    // Stop any ongoing TTS
+    stopSpeaking();
+
+    if (command && command.length > 0) {
+        // Send the command directly
+        textInput.value = command;
+        sendBtn.click();
+    } else {
+        // Just "Jarvis" was said.
+        // Start listening state visual
+        startThinking();
+        statusText.innerText = 'LISTENING...';
+    }
+}
+
+function stopSpeaking() {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+    }
+    // Also stop visualizer
+    stopThinking();
+
+    // Send a message to backend to clear any audio queues if processing
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send("STOP");
+    }
+}
+
 // Init
 window.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
@@ -428,4 +525,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // In some browsers voices are loaded synchronously immediately
     populateVoices();
+
+    // Start Wake Word Listener
+    // Note: User interaction usually required first to allow mic access
+    // We'll try to start it, but browser might block until a click.
+    // Adding a click listener to document to ensure we can start it once.
+    document.addEventListener('click', () => {
+        if (!recognition) {
+            initSpeechRecognition();
+        }
+    }, { once: true });
 });

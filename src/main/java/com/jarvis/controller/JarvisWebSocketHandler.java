@@ -20,6 +20,12 @@ public class JarvisWebSocketHandler extends AbstractWebSocketHandler {
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String payload = message.getPayload();
 
+        if ("STOP".equalsIgnoreCase(payload.trim())) {
+            // Received stop command, could interrupt backend processing if it was async
+            // For now, we just acknowledge or ignore
+            return;
+        }
+
         // Text chat path
         String response = jarvisService.processText(payload);
         session.sendMessage(new TextMessage("TEXT:" + response));
