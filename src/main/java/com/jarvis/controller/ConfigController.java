@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.jarvis.service.ProviderManager;
 import com.jarvis.provider.impl.GeminiLlmProvider;
 import com.jarvis.provider.LlmProvider;
+import com.jarvis.provider.TtsProvider;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -50,6 +51,10 @@ public class ConfigController {
             providerManager.getActiveLlmProvider().setModel(updates.get("model"));
         }
 
+        if (updates.containsKey("voice")) {
+            providerManager.getActiveTtsProvider().setVoice(updates.get("voice"));
+        }
+
         // Dynamically update API Keys if provided (e.g., for Gemini)
         if (updates.containsKey("geminiKey")) {
             LlmProvider gemini = providerManager.getLlmProvider("gemini");
@@ -81,6 +86,21 @@ public class ConfigController {
         response.put("activeProvider", llm.getProviderName());
         response.put("activeModel", llm.getActiveModel());
         response.put("availableModels", llm.getAvailableModels());
+        return response;
+    }
+
+    @GetMapping("/voices")
+    public Map<String, Object> getAvailableVoices(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String provider) {
+        TtsProvider tts = provider != null ? providerManager.getTtsProvider(provider)
+                : providerManager.getActiveTtsProvider();
+        if (tts == null)
+            tts = providerManager.getActiveTtsProvider();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("activeProvider", tts.getProviderName());
+        response.put("activeVoice", tts.getActiveVoice());
+        response.put("availableVoices", tts.getAvailableVoices());
         return response;
     }
 }

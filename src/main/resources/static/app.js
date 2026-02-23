@@ -27,6 +27,7 @@ const testConnResult = document.getElementById('test-conn-result');
 
 // Web Speech API
 let availableVoices = [];
+let recognition; // For wake word detection
 
 // Web Audio API context
 let audioContext;
@@ -107,6 +108,9 @@ async function fetchConfig() {
         ttsSelect.value = config.tts || 'mock';
         updateGeminiKeyVisibility();
         updateVoiceVisibility();
+        if (config.tts && config.tts !== 'browser') {
+            fetchVoicesForTts(config.tts);
+        }
     } catch (e) {
         configStatus.innerText = "CONFIG: ERROR";
     }
@@ -221,14 +225,17 @@ function updateGeminiKeyVisibility() {
     }
 }
 
-ttsSelect.addEventListener('change', updateVoiceVisibility);
+ttsSelect.addEventListener('change', () => {
+    updateVoiceVisibility();
+    if (ttsSelect.value === 'browser') {
+        populateVoices();
+    } else {
+        fetchVoicesForTts(ttsSelect.value);
+    }
+});
 
 function updateVoiceVisibility() {
-    if (ttsSelect.value === 'browser') {
-        voiceGroup.style.display = 'flex';
-    } else {
-        voiceGroup.style.display = 'none';
-    }
+    voiceGroup.style.display = 'flex';
 }
 
 // Web Speech API - Voice loading
@@ -289,12 +296,16 @@ function speakText(text) {
 
 testVoiceBtn.addEventListener('click', (e) => {
     e.preventDefault(); // Prevent accidental form submission if any
-    const selectedVoiceIndex = voiceSelect.value;
-    if (selectedVoiceIndex && availableVoices[selectedVoiceIndex]) {
-        const testPhrase = `Greetings. This is a test of the ${availableVoices[selectedVoiceIndex].name} vocal subsystem.`;
-        speakText(testPhrase);
+    if (ttsSelect.value === 'browser') {
+        const selectedVoiceIndex = voiceSelect.value;
+        if (selectedVoiceIndex && availableVoices[selectedVoiceIndex]) {
+            const testPhrase = `Greetings. This is a test of the ${availableVoices[selectedVoiceIndex].name} vocal subsystem.`;
+            speakText(testPhrase);
+        } else {
+            speakText("Please select a valid voice first.");
+        }
     } else {
-        speakText("Please select a valid voice first.");
+        logMessage('SYS', `Selected Voice: ${voiceSelect.value}. Use the chat input to test audio generation.`);
     }
 });
 
@@ -322,6 +333,33 @@ async function fetchModelsForLlm(llmName) {
         }
     } catch (e) {
         modelSelect.innerHTML = '<option value="" disabled>Error fetching models</option>';
+    }
+}
+
+async function fetchVoicesForTts(ttsName) {
+    voiceSelect.innerHTML = '<option value="" disabled selected>Loading voices...</option>';
+    voiceSelect.disabled = true;
+    try {
+        const res = await fetch(`/api/config/voices?provider=${ttsName}`);
+        const data = await res.json();
+
+        voiceSelect.innerHTML = '';
+        if (data.availableVoices && data.availableVoices.length > 0) {
+            data.availableVoices.forEach(voice => {
+                const opt = document.createElement('option');
+                opt.value = voice;
+                opt.innerText = voice;
+                if (voice === data.activeVoice) {
+                    opt.selected = true;
+                }
+                voiceSelect.appendChild(opt);
+            });
+            voiceSelect.disabled = false;
+        } else {
+            voiceSelect.innerHTML = '<option value="" disabled>No voices found</option>';
+        }
+    } catch (e) {
+        voiceSelect.innerHTML = '<option value="" disabled>Error fetching voices</option>';
     }
 }
 
@@ -357,7 +395,8 @@ saveSettingsBtn.addEventListener('click', async () => {
     const updates = {
         llm: activeLlm,
         tts: activeTts,
-        model: modelSelect.value
+        model: modelSelect.value,
+        voice: voiceSelect.value
     };
     if (activeLlm === 'gemini' && geminiKey) {
         updates.geminiKey = geminiKey;
@@ -383,6 +422,102 @@ saveSettingsBtn.addEventListener('click', async () => {
     }
 });
 
+// Wake Word / Speech Recognition
+function initSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        console.warn("Speech Recognition API not supported in this browser.");
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US'; // Default to English
+
+    recognition.onstart = () => {
+        console.log("Wake word listener started.");
+    };
+
+    recognition.onerror = (event) => {
+        // console.error("Speech recognition error", event.error);
+        if (event.error === 'not-allowed') {
+            logMessage('SYS', 'Microphone access denied.');
+        }
+    };
+
+    recognition.onend = () => {
+        // Auto-restart for continuous listening, unless manually stopped
+        // We use a flag or check 'recognition' object validity
+        if (recognition) {
+            try {
+                recognition.start();
+            } catch (e) {
+                // ignore if already started
+            }
+        }
+    };
+
+    recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            // We look at final results
+            if (event.results[i].isFinal) {
+                const transcript = event.results[i][0].transcript.trim().toLowerCase();
+                // console.log("Heard:", transcript);
+
+                if (transcript.includes("jarvis")) {
+                    // Extract command part
+                    // "hello jarvis what time is it" -> "what time is it"
+                    // "jarvis stop" -> "stop"
+                    const parts = transcript.split("jarvis");
+                    // Take the last part as the command usually? Or everything after first 'jarvis'?
+                    // Let's assume the user says "Jarvis, [command]"
+                    const command = parts.slice(1).join("jarvis").trim();
+
+                    handleWakeWord(command);
+                }
+            }
+        }
+    };
+
+    try {
+        recognition.start();
+    } catch (e) {
+        console.error("Failed to start recognition:", e);
+    }
+}
+
+function handleWakeWord(command) {
+    logMessage('USER', '[Wake Word Detected]');
+
+    // Stop any ongoing TTS
+    stopSpeaking();
+
+    if (command && command.length > 0) {
+        // Send the command directly
+        textInput.value = command;
+        sendBtn.click();
+    } else {
+        // Just "Jarvis" was said.
+        // Start listening state visual
+        startThinking();
+        statusText.innerText = 'LISTENING...';
+    }
+}
+
+function stopSpeaking() {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+    }
+    // Also stop visualizer
+    stopThinking();
+
+    // Send a message to backend to clear any audio queues if processing
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send("STOP");
+    }
+}
+
 // Init
 window.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
@@ -390,4 +525,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // In some browsers voices are loaded synchronously immediately
     populateVoices();
+
+    // Start Wake Word Listener
+    // Note: User interaction usually required first to allow mic access
+    // We'll try to start it, but browser might block until a click.
+    // Adding a click listener to document to ensure we can start it once.
+    document.addEventListener('click', () => {
+        if (!recognition) {
+            initSpeechRecognition();
+        }
+    }, { once: true });
 });
