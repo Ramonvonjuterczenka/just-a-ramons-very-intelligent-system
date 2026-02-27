@@ -33,21 +33,22 @@
     <section class="log-panel">
         <div class="log-header">COMMUNICATION LOG
             <div>
-                <button id="settings-btn">SETTINGS</button>
-                <button id="clear-log">CLEAR</button>
+                <button id="settings-btn" type="button">SETTINGS</button>
+                <button id="clear-log" type="button">CLEAR</button>
             </div>
         </div>
         <div class="log-content" id="log-content"></div>
         <div class="input-container">
-            <input type="text" id="text-input" placeholder="Enter override command or text query..." />
-            <button id="send-btn">SEND</button>
+            <input type="text" id="text-input" aria-label="Override command or text query" placeholder="Enter override command or text query..." />
+            <button id="send-btn" type="button">SEND</button>
         </div>
     </section>
 
     <!-- Settings Modal -->
-    <div id="settings-modal" class="modal hidden">
+    <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title"
+        aria-hidden="true">
         <div class="modal-content">
-            <h2>SYSTEM CONFIGURATION</h2>
+            <h2 id="settings-title">SYSTEM CONFIGURATION</h2>
 
             <div class="form-group">
                 <label for="llm-select">Cognitive Engine (LLM):</label>
@@ -56,6 +57,11 @@
                     <option value="ollama">OLLAMA (Local AI)</option>
                     <option value="gemini">GEMINI (Cloud AI)</option>
                 </select>
+            </div>
+
+            <div class="form-group" id="gemini-key-group">
+                <label for="gemini-key">Google Gemini API Key:</label>
+                <input type="password" id="gemini-key" placeholder="Enter API Key (sk-...)" />
             </div>
 
             <div class="form-group">
@@ -70,39 +76,95 @@
                 <select id="tts-select">
                     <option value="mock">MOCK (Text Only)</option>
                     <option value="browser">BROWSER (Speech API)</option>
+                    <option value="coqui">COQUI (High-Quality Open Source) ⭐ Recommended</option>
+                    <option value="google-cloud">GOOGLE CLOUD (Professional Neural)</option>
                 </select>
+                <p style="font-size: 11px; color: #a4b5c4; margin-top: 5px;">
+                    💡 Tip: For best JARVIS voice, choose COQUI (requires: <code>pip install TTS</code>) or GOOGLE CLOUD (requires API key)
+                </p>
+            </div>
+
+            <div class="form-group" style="border-top: 1px solid #444; padding-top: 12px; margin-top: 12px;">
+                <label style="width: 100%; font-weight: bold;">Voice Activation Settings:</label>
+                <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="wakeword-input" style="min-width: 80px; font-size: 12px;">Wakeword:</label>
+                        <input type="text" id="wakeword-input" value="jarvis" style="flex: 1; padding: 5px; background: #1a1a1a; color: #0ff; border: 1px solid #0ff;"/>
+                        <span style="font-size: 10px; color: #a4b5c4;">Default: "jarvis"</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="recognition-lang" style="min-width: 80px; font-size: 12px;">Language:</label>
+                        <select id="recognition-lang" style="flex: 1; padding: 5px; background: #1a1a1a; color: #0ff; border: 1px solid #0ff;">
+                            <option value="en-US">English (US)</option>
+                            <option value="en-GB">English (UK)</option>
+                            <option value="de-DE">German</option>
+                            <option value="fr-FR">French</option>
+                            <option value="es-ES">Spanish</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="voice-debug-toggle" style="cursor: pointer;"/>
+                        <label for="voice-debug-toggle" style="font-size: 12px; cursor: pointer;">🔍 Debug Mode (show partial results)</label>
+                    </div>
+                </div>
             </div>
 
             <div class="form-group" id="voice-group" style="display: none;">
                 <label for="voice-select">Browser Voice:</label>
                 <div style="display: flex; gap: 10px; width: 100%;">
-                    <select id="voice-select" style="flex: 1;">
+                    <select id="voice-select" style="flex: 1;" aria-label="Browser voice selection">
                         <!-- Populated by JS -->
                     </select>
-                    <button id="test-voice-btn" class="secondary"
+                    <button id="test-voice-btn" class="secondary" type="button"
                         style="padding: 5px 15px; font-size: 12px; white-space: nowrap;">TEST VOICE</button>
                 </div>
             </div>
 
+            <div class="form-group" id="voice-params-group" style="display: none;">
+                <label style="width: 100%;">Voice Parameters:</label>
+                <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="voice-rate" style="min-width: 60px; font-size: 12px;">Speech Rate:</label>
+                        <input type="range" id="voice-rate" min="0.5" max="1.5" step="0.1" value="0.85" style="flex: 1;"/>
+                        <span id="voice-rate-value" style="min-width: 30px; font-size: 12px;">0.85x</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="voice-pitch" style="min-width: 60px; font-size: 12px;">Pitch:</label>
+                        <input type="range" id="voice-pitch" min="0.5" max="2" step="0.1" value="1.1" style="flex: 1;"/>
+                        <span id="voice-pitch-value" style="min-width: 30px; font-size: 12px;">1.1x</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="voice-volume" style="min-width: 60px; font-size: 12px;">Volume:</label>
+                        <input type="range" id="voice-volume" min="0.3" max="1" step="0.1" value="0.9" style="flex: 1;"/>
+                        <span id="voice-volume-value" style="min-width: 30px; font-size: 12px;">0.9</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="form-group" style="flex-direction: row; gap: 10px; align-items: center;">
-                <button id="test-conn-btn" class="secondary" style="padding: 5px 10px; font-size: 12px;">TEST
+                <button id="test-conn-btn" class="secondary" type="button" style="padding: 5px 10px; font-size: 12px;">TEST
                     CONNECTION</button>
                 <span id="test-conn-result" style="font-size: 12px; color: #a4b5c4;"></span>
             </div>
 
-            <div class="form-group" id="gemini-key-group">
-                <label for="gemini-key">Google Gemini API Key:</label>
-                <input type="password" id="gemini-key" placeholder="Enter API Key (sk-...)" />
-            </div>
+
+
+            <div id="settings-error" role="alert" aria-live="assertive" class="visually-hidden"
+                style="color: #ff3333; padding: 6px 0;"></div>
 
             <div class="modal-actions">
-                <button id="save-settings-btn">SAVE & REBOOT</button>
-                <button id="close-settings-btn" class="secondary">CANCEL</button>
+                <button id="save-settings-btn" type="button">SAVE & REBOOT</button>
+                <span id="save-spinner" class="visually-hidden">Saving...</span>
+                <button id="close-settings-btn" class="secondary" type="button">CANCEL</button>
             </div>
         </div>
     </div>
 
+    <script src="voiceActivation.js"></script>
     <script src="app.js"></script>
+    <script src="settingsService.js"></script>
+    <script src="settingsState.js"></script>
+    <script src="settingsUi.js"></script>
 </body>
 
 </html>

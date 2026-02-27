@@ -1,0 +1,9 @@
+FROM ollama/ollama:latest
+
+# Copy the initialization script
+COPY ollama-init.sh /ollama-init.sh
+RUN chmod +x /ollama-init.sh
+
+# Set the custom entrypoint that pulls tinyllama on startup
+ENTRYPOINT ["/ollama-init.sh"]
+

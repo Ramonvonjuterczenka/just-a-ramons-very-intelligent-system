@@ -1,35 +1,51 @@
 version: '3.8'
 
 services:
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    container_name: jarvis-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      # Use Mistral as default model (better quality, still lightweight)
+      - OLLAMA_DEFAULT_MODEL=mistral
+    restart: unless-stopped
+
   jarvis-server:
     build: .
     container_name: jarvis-server
     ports:
       - "8080:8080"
     environment:
+      # Server
       - JARVIS_SERVER_PORT=8080
-      - JARVIS_STT_PROVIDER=mock
-      - JARVIS_TTS_PROVIDER=mock
-      - JARVIS_LLM_PROVIDER=ollama
-      - JARVIS_OLLAMA_URL=http://localhost:11434
-      - JARVIS_OLLAMA_MODEL=gemma3:1b
-      # Add real API Keys here when providers are implemented
-      #Gemini:
-      - JARVIS_OPENAI_KEY=AIzaSyBLTkS4wzBef3DR72ktUp5NKryE4JlVGDwsk
-      - jarvis.gemini.url=https://generativelanguage.googleapis.com
-      - jarvis.gemini.key=AIzaSyBLTkS4wzBef3DR72ktUp5NKryE4JlVGDwsk
-      - jarvis.gemini.model=gemini-2.5-flash
-    #  restart: unless-stopped
-    #  depends_on:
-    #    - ollama
-    #ollama:
-    #  image: ollama/ollama:latest
-    #  container_name: jarvis-ollama
-    #  ports:
-    #   - "11434:11434"
-    # volumes:
-    #  - ollama_data:/root/.ollama
-    #restart: unless-stopped
 
-    #volumes:
-    # ollama_data:
+      # Speech-to-Text (browser-based)
+      - JARVIS_STT_PROVIDER=browser
+
+      # Text-to-Speech (Coqui for high quality)
+      - JARVIS_TTS_PROVIDER=coqui
+      - JARVIS_COQUI_ENABLED=true
+      - JARVIS_COQUI_MODEL=tts_models/en/ljspeech/glow-tts
+
+      # Large Language Model (Ollama)
+      - JARVIS_LLM_PROVIDER=ollama
+      - JARVIS_OLLAMA_URL=http://ollama:11434
+      - JARVIS_OLLAMA_MODEL=mistral
+
+      # Optional: Gemini API (for cloud AI)
+      - JARVIS_GEMINI_URL=https://generativelanguage.googleapis.com
+      - JARVIS_GEMINI_KEY=
+      - JARVIS_GEMINI_MODEL=gemini-2.5-flash
+
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+    name: jarvis_ollama_data

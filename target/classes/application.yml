@@ -5,7 +5,24 @@ jarvis:
   providers:
     stt: ${JARVIS_STT_PROVIDER:mock}
     tts: ${JARVIS_TTS_PROVIDER:mock}
-    llm: ${JARVIS_LLM_PROVIDER:mock}
+    llm: ${JARVIS_LLM_PROVIDER:ollama}
+
+  ollama:
+    url: ${JARVIS_OLLAMA_URL:http://ollama:11434}
+    model: ${JARVIS_OLLAMA_MODEL:llama3.1}
+
+  # Coqui TTS Configuration (High-quality Open Source TTS)
+  coqui:
+    enabled: ${JARVIS_COQUI_ENABLED:true}
+    model: ${JARVIS_COQUI_MODEL:tts_models/en/ljspeech/glow-tts}
+    speaker: ${JARVIS_COQUI_SPEAKER:default}
+
+  # Google Cloud TTS Configuration (if you want high-quality cloud TTS)
+  google:
+    tts:
+      enabled: ${JARVIS_GOOGLE_TTS_ENABLED:false}
+      api-key: ${JARVIS_GOOGLE_TTS_KEY:}
+      voice: ${JARVIS_GOOGLE_TTS_VOICE:en-US-Neural2-C}
 
   system:
     prompt: ${JARVIS_SYSTEM_PROMPT:Du bist JARVIS, ein hochintelligenter, charmanter und leicht sarkastischer KI-Assistent. Du wurdest von Tony Stark erschaffen. Du sprichst immer Deutsch. Antworte immer prägnant und zielgerichtet, es sei denn, du wirst nach Details gefragt. Beziehe dich bei Bedarf auf 'Sir' oder 'Boss'.}

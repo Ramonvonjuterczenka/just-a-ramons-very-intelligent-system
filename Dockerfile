@@ -14,8 +14,15 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=builder /app/target/jarvis-0.0.1-SNAPSHOT.jar app.jar
 
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Add a small entrypoint script that waits for Ollama to be available
+COPY wait-and-run.sh /app/wait-and-run.sh
+RUN chmod +x /app/wait-and-run.sh
+
 # Expose port
 EXPOSE 8080
 
-# Run the jar file
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Run the wait-and-run script
+ENTRYPOINT ["/bin/sh", "/app/wait-and-run.sh"]

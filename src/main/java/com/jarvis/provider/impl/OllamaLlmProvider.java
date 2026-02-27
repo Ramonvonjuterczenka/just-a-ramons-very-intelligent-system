@@ -88,8 +88,29 @@ public class OllamaLlmProvider implements LlmProvider {
                         .collect(java.util.stream.Collectors.toList());
             }
         } catch (Exception e) {
-            System.err.println("Could not fetch Ollama models: " + e.getMessage());
+            System.err.println("Could not fetch Ollama models via /api/tags: " + e.getMessage());
         }
+
+        // Fallback: try /api/models which some Ollama versions expose
+        try {
+            Map response2 = webClient.get()
+                    .uri("/api/models")
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
+
+            if (response2 != null && response2.containsKey("models")) {
+                java.util.List<Map<String, Object>> models = (java.util.List<Map<String, Object>>) response2
+                        .get("models");
+                return models.stream()
+                        .map(m -> (String) m.getOrDefault("name", m.get("id")))
+                        .collect(java.util.stream.Collectors.toList());
+            }
+        } catch (Exception e) {
+            System.err.println("Could not fetch Ollama models via /api/models: " + e.getMessage());
+        }
+
+        // Last resort: return configured model as single option
         return java.util.Collections.singletonList(model);
     }
 }

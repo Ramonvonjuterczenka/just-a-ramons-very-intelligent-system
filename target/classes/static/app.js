@@ -9,29 +9,15 @@ const sendBtn = document.getElementById('send-btn');
 const clearBtn = document.getElementById('clear-log');
 const configStatus = document.getElementById('config-status');
 
-// Settings Elements
-const settingsBtn = document.getElementById('settings-btn');
-const settingsModal = document.getElementById('settings-modal');
-const closeSettingsBtn = document.getElementById('close-settings-btn');
-const saveSettingsBtn = document.getElementById('save-settings-btn');
-const llmSelect = document.getElementById('llm-select');
-const modelSelect = document.getElementById('model-select');
-const ttsSelect = document.getElementById('tts-select');
-const voiceSelect = document.getElementById('voice-select');
-const voiceGroup = document.getElementById('voice-group');
-const testVoiceBtn = document.getElementById('test-voice-btn');
-const geminiKeyGroup = document.getElementById('gemini-key-group');
-const geminiKeyInput = document.getElementById('gemini-key');
-const testConnBtn = document.getElementById('test-conn-btn');
-const testConnResult = document.getElementById('test-conn-result');
+// Initialize JARVIS voice parameters (Iron Man style)
+window.voiceParams = {
+    rate: 0.85,   // Slower, more articulate speech
+    pitch: 1.1,   // Slightly higher, more sophisticated pitch
+    volume: 0.9   // Clear, confident volume
+};
 
 // Web Speech API
-let availableVoices = [];
-
-// Web Audio API context
-let audioContext;
-let scriptProcessor;
-let mediaStream;
+// availableVoices removed; speakText will query speechSynthesis directly.
 
 // Connect WebSocket
 function connectWebSocket() {
@@ -74,12 +60,16 @@ function connectWebSocket() {
                 simulateAudioPlayback();
             } else if (textContent.startsWith("BROWSER_TTS_PAYLOAD:")) {
                 const msg = textContent.substring(20);
-                // Read text aloud
+                // Read text aloud using browser TTS
                 speakText(msg);
+            } else if (textContent.startsWith("PYTTSX3_UNAVAILABLE:")) {
+                const msg = textContent.substring(20);
+                logMessage('JARVIS', msg);
+                speakText(msg);  // Fallback to browser TTS
             } else {
-                logMessage('JARVIS', 'Received Binary Audio Payload... (Playback requires real TTS)');
-                // Here you would decode audioData and play it
-                // await playAudio(event.data);
+                // Assume it's real audio data (WAV, MP3, etc.)
+                logMessage('JARVIS', '[Audio Response Received]');
+                playAudioData(event.data);
             }
         }
     };
@@ -102,11 +92,11 @@ async function fetchConfig() {
         const config = await res.json();
         configStatus.innerText = `STT:[${config.stt}] LLM:[${config.llm}] TTS:[${config.tts}]`;
 
-        // Sync UI with current backend state
-        llmSelect.value = config.llm || 'mock';
-        ttsSelect.value = config.tts || 'mock';
-        updateGeminiKeyVisibility();
-        updateVoiceVisibility();
+        // Notify settings module about current backend state (if available)
+        if (window.SettingsState && typeof window.SettingsState.setConfig === 'function') {
+            window.SettingsState.setConfig(config);
+        }
+
     } catch (e) {
         configStatus.innerText = "CONFIG: ERROR";
     }
@@ -141,6 +131,41 @@ function simulateAudioPlayback() {
     }, 2000); // simulate 2s playback
 }
 
+// Play real audio data (WAV, MP3, etc.) from high-quality TTS providers
+function playAudioData(audioBuffer) {
+    try {
+        // Create blob from audio data
+        const blob = new Blob([audioBuffer], { type: 'audio/wav' });  // or audio/mpeg for MP3
+        const audioUrl = URL.createObjectURL(blob);
+
+        // Create and play audio element
+        const audio = new Audio();
+        audio.src = audioUrl;
+
+        audio.onplay = () => {
+            arcReactor.classList.add('active');
+            statusText.innerText = 'SPEAKING...';
+        };
+
+        audio.onended = () => {
+            arcReactor.classList.remove('active');
+            statusText.innerText = 'SYSTEM ONLINE';
+            URL.revokeObjectURL(audioUrl);  // Cleanup
+        };
+
+        audio.onerror = (e) => {
+            console.error("Audio playback error:", e);
+            arcReactor.classList.remove('active');
+            statusText.innerText = 'SYSTEM ONLINE';
+        };
+
+        audio.play();
+    } catch (e) {
+        console.error("Error playing audio:", e);
+        arcReactor.classList.remove('active');
+        statusText.innerText = 'SYSTEM ONLINE';
+    }
+}
 
 // Event Listeners
 sendBtn.addEventListener('click', () => {
@@ -162,96 +187,43 @@ clearBtn.addEventListener('click', () => {
 });
 
 micBtn.addEventListener('click', () => {
-    if (!isRecording) {
-        startRecordingMode();
-    } else {
-        stopRecordingMode();
+    if (window.VoiceActivation) {
+        if (window.VoiceActivation.isListening()) {
+            // Stop voice activation
+            window.VoiceActivation.stop();
+            isRecording = false;
+            arcReactor.classList.remove('active');
+            arcReactor.style.boxShadow = '';
+            statusText.innerText = 'VOICE ACTIVATION DISABLED';
+            statusText.style.color = '#ff3333';
+            logMessage('SYS', '🔇 Voice Activation Disabled');
+        } else {
+            // Start voice activation
+            window.VoiceActivation.start();
+            isRecording = true;
+            statusText.innerText = 'LISTENING FOR: "JARVIS"';
+            statusText.style.color = '#33ff33';
+            logMessage('SYS', '🎤 Voice Activation Enabled - Say "JARVIS"');
+        }
     }
 });
 
-// Mock Recording functionality (Real recording requires getUserMedia)
+// Voice Activation - no longer needed (handled by voiceActivation.js)
 function startRecordingMode() {
-    // We are mocking real mic access for simplicity in the mock. 
-    // Usually you'd use navigator.mediaDevices.getUserMedia({ audio: true })
-    isRecording = true;
-    arcReactor.classList.add('active');
-    arcReactor.style.boxShadow = "0 0 60px #ff3333, inset 0 0 60px #ff3333"; // Red for recording
-    statusText.innerText = 'LISTENING...';
-    statusText.style.color = '#ff3333';
+    if (window.VoiceActivation) {
+        window.VoiceActivation.start();
+    }
 }
 
 function stopRecordingMode() {
-    isRecording = false;
-    arcReactor.classList.remove('active');
-    arcReactor.style.boxShadow = ""; // reset
-    statusText.style.color = ""; // reset
-    startThinking();
-
-    // Simulate sending an audio blob to WebSocket after recording
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        logMessage('USER (Audio)', '[Sent Voice Data]');
-        // Sending a dummy byte array representing 1 sec of audio
-        const dummyAudio = new Uint8Array(1024);
-        ws.send(dummyAudio.buffer);
+    if (window.VoiceActivation) {
+        window.VoiceActivation.stop();
     }
 }
 
-// Settings Logic
-settingsBtn.addEventListener('click', () => {
-    settingsModal.classList.remove('hidden');
-    testConnResult.innerText = '';
-    updateGeminiKeyVisibility();
-    fetchModelsForLlm(llmSelect.value);
-});
+// Removed settings-related handlers and functions (moved to settingsUi.js)
 
-closeSettingsBtn.addEventListener('click', () => {
-    settingsModal.classList.add('hidden');
-});
-
-llmSelect.addEventListener('change', () => {
-    updateGeminiKeyVisibility();
-    fetchModelsForLlm(llmSelect.value);
-});
-
-function updateGeminiKeyVisibility() {
-    if (llmSelect.value === 'gemini') {
-        geminiKeyGroup.style.display = 'flex';
-    } else {
-        geminiKeyGroup.style.display = 'none';
-    }
-}
-
-ttsSelect.addEventListener('change', updateVoiceVisibility);
-
-function updateVoiceVisibility() {
-    if (ttsSelect.value === 'browser') {
-        voiceGroup.style.display = 'flex';
-    } else {
-        voiceGroup.style.display = 'none';
-    }
-}
-
-// Web Speech API - Voice loading
-function populateVoices() {
-    availableVoices = window.speechSynthesis.getVoices();
-    voiceSelect.innerHTML = '';
-
-    availableVoices.forEach((voice, index) => {
-        const option = document.createElement('option');
-        option.textContent = `${voice.name} (${voice.lang})`;
-        option.value = index;
-
-        if (voice.default) {
-            option.selected = true;
-        }
-        voiceSelect.appendChild(option);
-    });
-}
-
-if (speechSynthesis.onvoiceschanged !== undefined) {
-    speechSynthesis.onvoiceschanged = populateVoices;
-}
-
+// Web Speech API - Voice loading with JARVIS-style parameters
 function speakText(text) {
     if ('speechSynthesis' in window) {
         // Cancel any ongoing speech
@@ -259,9 +231,35 @@ function speakText(text) {
 
         const utterance = new SpeechSynthesisUtterance(text);
 
-        const selectedVoiceIndex = voiceSelect.value;
-        if (selectedVoiceIndex && availableVoices[selectedVoiceIndex]) {
-            utterance.voice = availableVoices[selectedVoiceIndex];
+        // JARVIS-style voice parameters (inspired by Iron Man's JARVIS)
+        // Slower, more articulate speech with British sophistication
+        utterance.rate = (window.voiceParams && window.voiceParams.rate) || 0.85;      // Slower speech rate
+        utterance.pitch = (window.voiceParams && window.voiceParams.pitch) || 1.1;     // Slightly higher pitch
+        utterance.volume = (window.voiceParams && window.voiceParams.volume) || 0.9;   // Clear, confident volume
+
+        // Resolve selected voice by stable id (name::lang) when possible
+        try {
+            const vid = (document.getElementById('voice-select') || {}).value;
+            const voicesList = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
+            if (vid && voicesList && voicesList.length) {
+                const parts = vid.split('::');
+                if (parts.length === 2) {
+                    const [name, lang] = parts;
+                    const match = voicesList.find(v => v.name === name && v.lang === lang);
+                    if (match) utterance.voice = match;
+                }
+            } else if (voicesList && voicesList.length) {
+                // If no voice selected, try to find a sophisticated-sounding voice
+                // Prefer English voices, preferably with "Google" or "Microsoft" in the name
+                const preferredVoice =
+                    voicesList.find(v => v.lang.startsWith('en') && v.name.includes('Google')) ||
+                    voicesList.find(v => v.lang.startsWith('en') && v.name.includes('Microsoft')) ||
+                    voicesList.find(v => v.lang.startsWith('en-GB')) ||
+                    voicesList.find(v => v.lang.startsWith('en'));
+                if (preferredVoice) utterance.voice = preferredVoice;
+            }
+        } catch (e) {
+            console.warn('Error resolving voice for speakText', e);
         }
 
         // UI visualizer integration
@@ -287,107 +285,43 @@ function speakText(text) {
     }
 }
 
-testVoiceBtn.addEventListener('click', (e) => {
-    e.preventDefault(); // Prevent accidental form submission if any
-    const selectedVoiceIndex = voiceSelect.value;
-    if (selectedVoiceIndex && availableVoices[selectedVoiceIndex]) {
-        const testPhrase = `Greetings. This is a test of the ${availableVoices[selectedVoiceIndex].name} vocal subsystem.`;
-        speakText(testPhrase);
-    } else {
-        speakText("Please select a valid voice first.");
-    }
-});
-
-async function fetchModelsForLlm(llmName) {
-    modelSelect.innerHTML = '<option value="" disabled selected>Loading models...</option>';
-    modelSelect.disabled = true;
-    try {
-        const res = await fetch(`/api/config/models?provider=${llmName}`);
-        const data = await res.json();
-
-        modelSelect.innerHTML = '';
-        if (data.availableModels && data.availableModels.length > 0) {
-            data.availableModels.forEach(model => {
-                const opt = document.createElement('option');
-                opt.value = model;
-                opt.innerText = model;
-                if (model === data.activeModel) {
-                    opt.selected = true;
-                }
-                modelSelect.appendChild(opt);
-            });
-            modelSelect.disabled = false;
-        } else {
-            modelSelect.innerHTML = '<option value="" disabled>No models found</option>';
-        }
-    } catch (e) {
-        modelSelect.innerHTML = '<option value="" disabled>Error fetching models</option>';
-    }
-}
-
-testConnBtn.addEventListener('click', async () => {
-    testConnResult.innerText = 'Testing active config... (Save first)';
-    testConnResult.style.color = '#a4b5c4';
-    testConnBtn.disabled = true;
-    try {
-        const res = await fetch('/api/config/test');
-        const data = await res.json();
-        if (data.success === "true") {
-            testConnResult.innerText = `Success: ${data.message}`;
-            testConnResult.style.color = '#33ff33';
-        } else {
-            testConnResult.innerText = `Failed: ${data.message}`;
-            testConnResult.style.color = '#ff3333';
-        }
-    } catch (e) {
-        testConnResult.innerText = 'Test Failed (Network Error)';
-        testConnResult.style.color = '#ff3333';
-    } finally {
-        testConnBtn.disabled = false;
-    }
-});
-
-saveSettingsBtn.addEventListener('click', async () => {
-    const activeLlm = llmSelect.value;
-    const activeTts = ttsSelect.value;
-    const geminiKey = geminiKeyInput.value.trim();
-
-    saveSettingsBtn.innerText = 'SAVING...';
-
-    const updates = {
-        llm: activeLlm,
-        tts: activeTts,
-        model: modelSelect.value
-    };
-    if (activeLlm === 'gemini' && geminiKey) {
-        updates.geminiKey = geminiKey;
-    }
-
-    try {
-        const res = await fetch('/api/config', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(updates)
-        });
-
-        const newConfig = await res.json();
-        configStatus.innerText = `STT:[${newConfig.stt}] LLM:[${newConfig.llm}] TTS:[${newConfig.tts}]`;
-        settingsModal.classList.add('hidden');
-        logMessage('SYS', `Configuration Updated. LLM: ${newConfig.llm.toUpperCase()}`);
-    } catch (e) {
-        logMessage('SYS', 'Failed to save configuration.');
-    } finally {
-        saveSettingsBtn.innerText = 'SAVE & REBOOT';
-    }
-});
-
 // Init
 window.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
     fetchConfig();
 
-    // In some browsers voices are loaded synchronously immediately
-    populateVoices();
+    // Initialize voice activation (continuous listening for "JARVIS" wakeword)
+    // Wait a moment to ensure voiceActivation.js is fully loaded
+    setTimeout(() => {
+        if (window.VoiceActivation && window.voiceActivationReady === true) {
+            console.log('✅ Voice Activation module loaded successfully');
+            window.VoiceActivation.init();
+
+            // Start listening for wakeword after another short delay
+            setTimeout(() => {
+                if (window.voiceActivationReady) {
+                    window.VoiceActivation.start();
+                    logMessage('SYS', '🎤 Voice Activation Ready - Say "JARVIS" to activate');
+                } else {
+                    console.warn('⚠️ Voice Activation not ready - check browser compatibility');
+                    logMessage('SYS', '⚠️ Voice Activation not available - check browser compatibility');
+                }
+            }, 300);
+        } else if (window.VoiceActivation === undefined) {
+            console.error('❌ Voice Activation module NOT found - voiceActivation.js may not have loaded');
+            logMessage('SYS', '❌ Voice Activation module not loaded');
+        } else {
+            console.warn('⚠️ Voice Activation module found but not ready');
+            logMessage('SYS', '⚠️ Voice Activation initializing...');
+            // Try again after a delay
+            setTimeout(() => {
+                if (window.voiceActivationReady === true) {
+                    window.VoiceActivation.start();
+                    logMessage('SYS', '🎤 Voice Activation Ready');
+                }
+            }, 1000);
+        }
+    }, 200);
+
+    // Settings UI will load voices when the modal opens; no immediate populate here.
 });
