@@ -9,12 +9,34 @@ const sendBtn = document.getElementById('send-btn');
 const clearBtn = document.getElementById('clear-log');
 const configStatus = document.getElementById('config-status');
 
+// Make WebSocket globally accessible for voiceActivation.js
+window.ws = null;
+
 // Initialize JARVIS voice parameters (Iron Man style)
 window.voiceParams = {
     rate: 0.85,   // Slower, more articulate speech
     pitch: 1.1,   // Slightly higher, more sophisticated pitch
     volume: 0.9   // Clear, confident volume
 };
+
+/**
+ * Load voice parameters from localStorage at startup
+ */
+function loadVoiceParamsFromStorage() {
+    try {
+        if (window.SettingsState && window.SettingsState.loadVoiceParams) {
+            const savedParams = window.SettingsState.loadVoiceParams();
+            if (savedParams) {
+                window.voiceParams.rate = savedParams.rate !== undefined ? savedParams.rate : 0.85;
+                window.voiceParams.pitch = savedParams.pitch !== undefined ? savedParams.pitch : 1.1;
+                window.voiceParams.volume = savedParams.volume !== undefined ? savedParams.volume : 0.9;
+                console.log('[APP] ✅ Voice parameters loaded from storage:', window.voiceParams);
+            }
+        }
+    } catch (e) {
+        console.error('[APP] Error loading voice params from storage:', e.message);
+    }
+}
 
 // Web Speech API
 // availableVoices removed; speakText will query speechSynthesis directly.
@@ -25,11 +47,13 @@ function connectWebSocket() {
     const wsUrl = `${protocol}//${window.location.host}/jarvis-ws`;
 
     ws = new WebSocket(wsUrl);
+    window.ws = ws;  // Make globally accessible for voiceActivation.js
     ws.binaryType = 'arraybuffer';
 
     ws.onopen = () => {
         logMessage('SYS', 'WebSocket Connection Established.');
         statusText.innerText = 'SYSTEM ONLINE';
+        console.log('[APP] ✅ WebSocket connected, window.ws is available for voiceActivation');
     };
 
     ws.onmessage = async (event) => {
@@ -170,9 +194,9 @@ function playAudioData(audioBuffer) {
 // Event Listeners
 sendBtn.addEventListener('click', () => {
     const text = textInput.value.trim();
-    if (text && ws && ws.readyState === WebSocket.OPEN) {
+    if (text && window.ws && window.ws.readyState === WebSocket.OPEN) {
         logMessage('USER', text);
-        ws.send(text);
+        window.ws.send(text);
         textInput.value = '';
         startThinking();
     }
@@ -288,6 +312,10 @@ function speakText(text) {
 // Init
 window.addEventListener('DOMContentLoaded', () => {
     console.log('[APP] DOMContentLoaded fired - initializing JARVIS...');
+
+    // Load voice parameters from localStorage
+    loadVoiceParamsFromStorage();
+
     connectWebSocket();
     fetchConfig();
 

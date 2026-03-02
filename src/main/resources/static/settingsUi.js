@@ -46,6 +46,63 @@
         dom.settingsModal.classList.add('hidden');
     }
 
+    /**
+     * Restore settings from localStorage when modal opens
+     */
+    function restoreSettings() {
+        if (!window.SettingsState) return;
+
+        const prefs = window.SettingsState.loadPreferences();
+        if (!prefs) {
+            console.log('[SettingsUi] No saved preferences found');
+            return;
+        }
+
+        console.log('[SettingsUi] Restoring preferences from localStorage:', prefs);
+
+        // Restore voice activation settings
+        if (prefs.wakeword && dom.wakewordInput) {
+            dom.wakewordInput.value = prefs.wakeword;
+        }
+        if (prefs.language && dom.recognitionLangSelect) {
+            dom.recognitionLangSelect.value = prefs.language;
+        }
+        if (prefs.microphoneId && dom.microphoneSelect) {
+            dom.microphoneSelect.value = prefs.microphoneId;
+        }
+        if (prefs.voiceId && dom.voiceSelect) {
+            dom.voiceSelect.value = prefs.voiceId;
+        }
+
+        // Restore voice parameters from localStorage
+        const savedParams = window.SettingsState.loadVoiceParams();
+        if (savedParams) {
+            if (savedParams.rate !== undefined && dom.voiceRateInput) {
+                dom.voiceRateInput.value = savedParams.rate;
+                if (dom.voiceRateValue) dom.voiceRateValue.innerText = savedParams.rate.toFixed(2) + 'x';
+                window.voiceParams = window.voiceParams || {};
+                window.voiceParams.rate = savedParams.rate;
+            }
+            if (savedParams.pitch !== undefined && dom.voicePitchInput) {
+                dom.voicePitchInput.value = savedParams.pitch;
+                if (dom.voicePitchValue) dom.voicePitchValue.innerText = savedParams.pitch.toFixed(2) + 'x';
+                window.voiceParams = window.voiceParams || {};
+                window.voiceParams.pitch = savedParams.pitch;
+            }
+            if (savedParams.volume !== undefined && dom.voiceVolumeInput) {
+                dom.voiceVolumeInput.value = savedParams.volume;
+                if (dom.voiceVolumeValue) dom.voiceVolumeValue.innerText = savedParams.volume.toFixed(2);
+                window.voiceParams = window.voiceParams || {};
+                window.voiceParams.volume = savedParams.volume;
+            }
+        }
+
+        // Note: llm, tts, model come from server config, not localStorage
+        // But we can highlight which ones were selected before
+        console.log('[SettingsUi] Preferences restored. Voice settings:', prefs);
+    }
+
+
     function updateGeminiKeyVisibility() {
         if (!dom.llmSelect) return;
         if (dom.llmSelect.value === 'gemini') {
@@ -289,6 +346,29 @@
         try {
             const newConfig = await window.SettingsService.saveConfig(payload);
             window.SettingsState.setConfig(newConfig);
+
+            // Save voice activation preferences to LocalStorage
+            const voicePrefs = {
+                wakeword: dom.wakewordInput ? dom.wakewordInput.value.trim().toLowerCase() : 'jarvis',
+                language: dom.recognitionLangSelect ? dom.recognitionLangSelect.value : 'en-US',
+                microphoneId: dom.microphoneSelect ? dom.microphoneSelect.value : '',
+                voiceId: dom.voiceSelect ? dom.voiceSelect.value : '',
+                llm: payload.llm,
+                tts: payload.tts,
+                model: payload.model,
+                geminiKey: payload.geminiKey || ''
+            };
+
+            // Save to localStorage using SettingsState
+            if (window.SettingsState && window.SettingsState.savePreferences) {
+                window.SettingsState.savePreferences(voicePrefs);
+            }
+
+            // Save voice parameters separately
+            if (window.voiceParams && window.SettingsState && window.SettingsState.saveVoiceParams) {
+                window.SettingsState.saveVoiceParams(window.voiceParams);
+            }
+
             hideModal();
             // logMessage is global in app.js
             if (window.logMessage) window.logMessage('SYS', `Configuration Updated. LLM: ${newConfig.llm.toUpperCase()}`);
@@ -304,6 +384,7 @@
     if (dom.settingsBtn) dom.settingsBtn.addEventListener('click', () => {
         clearError();
         showModal();
+        restoreSettings();
         updateGeminiKeyVisibility();
         updateVoiceVisibility();
         fetchModels(dom.llmSelect ? dom.llmSelect.value : 'mock');

@@ -32,10 +32,32 @@
     let interimTranscript = '';
 
     /**
+     * Load saved preferences from localStorage
+     */
+    function loadSavedPreferences() {
+        try {
+            if (window.SettingsState && window.SettingsState.loadPreferences) {
+                const prefs = window.SettingsState.loadPreferences();
+                if (prefs) {
+                    if (prefs.wakeword) CONFIG.wakeword = prefs.wakeword;
+                    if (prefs.language) CONFIG.language = prefs.language;
+                    if (prefs.microphoneId) CONFIG.microphoneId = prefs.microphoneId;
+                    console.log('[VA] 📦 Loaded preferences from localStorage:', { wakeword: CONFIG.wakeword, language: CONFIG.language, microphoneId: CONFIG.microphoneId });
+                }
+            }
+        } catch (e) {
+            console.error('[VA] Error loading saved preferences:', e.message);
+        }
+    }
+
+    /**
      * Initialize recognizer
      */
     function initializeVoiceActivation() {
         try {
+            // Load saved preferences first
+            loadSavedPreferences();
+
             recognizer = new SpeechRecognition();
             recognizer.continuous = CONFIG.continuous;
             recognizer.interimResults = CONFIG.interimResults;
@@ -47,12 +69,15 @@
             };
 
             recognizer.onresult = (event) => {
-                finalTranscript = '';
-                interimTranscript = '';
+                // Only clear on first result of this recognition session
+                if (event.resultIndex === 0) {
+                    finalTranscript = '';
+                    interimTranscript = '';
+                }
 
                 console.log('[VA] 📡 onresult event fired - resultIndex:', event.resultIndex, 'total results:', event.results.length);
 
-                // Get all results
+                // Get all results from resultIndex onwards
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const result = event.results[i];
                     const isFinal = result.isFinal;
@@ -273,31 +298,100 @@
      */
     function sendVoiceCommand(command) {
         console.log('[VA] 📤 Sending voice command to server:', command);
+        console.log('[VA] Current WS state:', window.ws ? window.ws.readyState : 'undefined');
+
+        isProcessing = true;
+
+        // Stop current recognition session
+        if (recognizer) {
+            try {
+                recognizer.stop();
+                console.log('[VA] ⏹️ Recognizer stopped for command send');
+            } catch (e) {
+                console.error('[VA] Error stopping recognizer:', e.message);
+            }
+        }
 
         // Log to chat (same as app.js does)
         if (window.logMessage) {
             window.logMessage('USER (Voice)', command);
         }
 
-        // Send via WebSocket (same as app.js text input)
+        // Ensure WebSocket is connected before sending
         if (window.ws && window.ws.readyState === WebSocket.OPEN) {
             window.ws.send(command);
-
-            // Start thinking animation (same as app.js)
             if (window.startThinking) {
                 window.startThinking();
             }
+            console.log('[VA] ✅ Command sent to server immediately');
 
-            console.log('[VA] ✅ Command sent to server');
+            // Restart listening for next command
+            setTimeout(() => {
+                isListening = false;
+                isProcessing = false;
+                startListening();
+            }, 1000);
         } else {
-            console.error('[VA] ❌ WebSocket not connected');
-        }
+            console.log('[VA] ⚠️ WebSocket not ready (state:', window.ws ? window.ws.readyState : 'null', '), establishing connection...');
 
-        // Restart listening for next command
-        setTimeout(() => {
-            isListening = false;
-            startListening();
-        }, 500);
+            // First, ensure WebSocket is connecting
+            if (window.connectWebSocket) {
+                console.log('[VA] 🔗 Calling connectWebSocket()');
+                window.connectWebSocket();
+            } else {
+                console.error('[VA] ❌ connectWebSocket() not available!');
+            }
+
+            if (window.fetchConfig) {
+                console.log('[VA] ⚙️ Calling fetchConfig()');
+                window.fetchConfig();
+            }
+
+            // Retry sending with much longer timeout (up to 30 seconds)
+            const maxRetries = 60;  // 60 * 500ms = 30 seconds
+            let retries = 0;
+            let sent = false;
+
+            const retryInterval = setInterval(() => {
+                if (sent) {
+                    clearInterval(retryInterval);
+                    return;
+                }
+
+                const wsState = window.ws ? window.ws.readyState : 'undefined';
+                console.log(`[VA] Retry ${retries + 1}/${maxRetries} - WS state: ${wsState} (CONNECTING=0, OPEN=1, CLOSING=2, CLOSED=3)`);
+
+                if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+                    console.log('[VA] 📨 WebSocket connected! Sending command now...');
+                    window.ws.send(command);
+                    if (window.startThinking) {
+                        window.startThinking();
+                    }
+                    console.log('[VA] ✅ Command sent to server (after retry)');
+                    sent = true;
+                    clearInterval(retryInterval);
+
+                    // Restart listening
+                    setTimeout(() => {
+                        isListening = false;
+                        isProcessing = false;
+                        startListening();
+                    }, 1000);
+                } else if (retries >= maxRetries) {
+                    console.error('[VA] ❌ WebSocket connection timeout after 30 seconds');
+                    clearInterval(retryInterval);
+                    sent = true;
+
+                    // Still try to restart listening
+                    isProcessing = false;
+                    setTimeout(() => {
+                        isListening = false;
+                        startListening();
+                    }, 1000);
+                }
+                retries++;
+            }, 500);
+        }
     }
 
     /**
@@ -318,9 +412,10 @@
             arcReactor.style.boxShadow = "0 0 60px #ff3333, inset 0 0 60px #ff3333";
         }
 
-        // Auto-stop after 10 seconds
+        // Auto-stop after 10 seconds of inactivity
         setTimeout(() => {
             if (isProcessing) {
+                console.log('[VA] ⏱️ Recording timeout - auto-stopping');
                 stopRecording();
             }
         }, 10000);
@@ -330,10 +425,18 @@
      * Stop recording mode and send command to server
      */
     function stopRecording() {
-        isProcessing = false;
-
         console.log('[VA] ⏹️ Recording stopped');
         updateStatusText('PROCESSING...');
+
+        // Stop recognizer
+        if (recognizer) {
+            try {
+                recognizer.stop();
+                console.log('[VA] ⏹️ Recognizer stopped');
+            } catch (e) {
+                console.error('[VA] Error stopping recognizer in stopRecording:', e.message);
+            }
+        }
 
         // Reset arc reactor
         const arcReactor = document.querySelector('.arc-reactor');
@@ -345,9 +448,11 @@
         // Send command if we have text
         if (finalTranscript.trim()) {
             const command = finalTranscript.trim();
+            isProcessing = false;
             sendVoiceCommand(command);
         } else {
             console.log('[VA] ⚠️ No command captured, resuming listening');
+            isProcessing = false;
             // Resume listening after a moment
             setTimeout(() => {
                 isListening = false;
