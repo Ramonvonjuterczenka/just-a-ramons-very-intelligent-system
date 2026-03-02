@@ -287,41 +287,19 @@ function speakText(text) {
 
 // Init
 window.addEventListener('DOMContentLoaded', () => {
+    console.log('[APP] DOMContentLoaded fired - initializing JARVIS...');
     connectWebSocket();
     fetchConfig();
 
-    // Initialize voice activation (continuous listening for "JARVIS" wakeword)
-    // Wait a moment to ensure voiceActivation.js is fully loaded
+    // Voice Activation is initialized automatically by voiceActivation.js
+    // Monitor that it's loaded properly
     setTimeout(() => {
-        if (window.VoiceActivation && window.voiceActivationReady === true) {
-            console.log('✅ Voice Activation module loaded successfully');
-            window.VoiceActivation.init();
-
-            // Start listening for wakeword after another short delay
-            setTimeout(() => {
-                if (window.voiceActivationReady) {
-                    window.VoiceActivation.start();
-                    logMessage('SYS', '🎤 Voice Activation Ready - Say "JARVIS" to activate');
-                } else {
-                    console.warn('⚠️ Voice Activation not ready - check browser compatibility');
-                    logMessage('SYS', '⚠️ Voice Activation not available - check browser compatibility');
-                }
-            }, 300);
-        } else if (window.VoiceActivation === undefined) {
-            console.error('❌ Voice Activation module NOT found - voiceActivation.js may not have loaded');
-            logMessage('SYS', '❌ Voice Activation module not loaded');
+        if (window.VoiceActivation) {
+            console.log('[APP] ✅ Voice Activation module found');
+            console.log('[APP] Voice Activation config:', window.VoiceActivation.getConfig());
         } else {
-            console.warn('⚠️ Voice Activation module found but not ready');
-            logMessage('SYS', '⚠️ Voice Activation initializing...');
-            // Try again after a delay
-            setTimeout(() => {
-                if (window.voiceActivationReady === true) {
-                    window.VoiceActivation.start();
-                    logMessage('SYS', '🎤 Voice Activation Ready');
-                }
-            }, 1000);
+            console.warn('[APP] ⚠️ Voice Activation module NOT found - check script loading order');
         }
-    }, 200);
-
-    // Settings UI will load voices when the modal opens; no immediate populate here.
+        console.log('[APP] JARVIS application ready');
+    }, 500);
 });

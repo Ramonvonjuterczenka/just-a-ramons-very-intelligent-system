@@ -287,12 +287,19 @@ function speakText(text) {
 
 // Init
 window.addEventListener('DOMContentLoaded', () => {
+    console.log('[APP] DOMContentLoaded fired - initializing JARVIS...');
     connectWebSocket();
     fetchConfig();
 
     // Voice Activation is initialized automatically by voiceActivation.js
-    // No need to do anything here - just log that we're ready
+    // Monitor that it's loaded properly
     setTimeout(() => {
+        if (window.VoiceActivation) {
+            console.log('[APP] ✅ Voice Activation module found');
+            console.log('[APP] Voice Activation config:', window.VoiceActivation.getConfig());
+        } else {
+            console.warn('[APP] ⚠️ Voice Activation module NOT found - check script loading order');
+        }
         console.log('[APP] JARVIS application ready');
-    }, 1000);
+    }, 500);
 });

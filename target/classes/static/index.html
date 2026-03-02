@@ -59,6 +59,11 @@
                 </select>
             </div>
 
+            <div class="form-group" id="gemini-key-group">
+                <label for="gemini-key">Google Gemini API Key:</label>
+                <input type="password" id="gemini-key" placeholder="Enter API Key (sk-...)" />
+            </div>
+
             <div class="form-group">
                 <label for="model-select">AI Model:</label>
                 <select id="model-select">
@@ -96,6 +101,13 @@
                             <option value="fr-FR">French</option>
                             <option value="es-ES">Spanish</option>
                         </select>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="microphone-select" style="min-width: 80px; font-size: 12px;">🎙️ Microphone:</label>
+                        <select id="microphone-select" style="flex: 1; padding: 5px; background: #1a1a1a; color: #0ff; border: 1px solid #0ff;">
+                            <option value="">Default (auto-detect)</option>
+                        </select>
+                        <button id="refresh-mics-btn" class="secondary" type="button" style="padding: 5px 12px; font-size: 11px; white-space: nowrap;">🔄 REFRESH</button>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <input type="checkbox" id="voice-debug-toggle" style="cursor: pointer;"/>
@@ -142,10 +154,7 @@
                 <span id="test-conn-result" style="font-size: 12px; color: #a4b5c4;"></span>
             </div>
 
-            <div class="form-group" id="gemini-key-group">
-                <label for="gemini-key">Google Gemini API Key:</label>
-                <input type="password" id="gemini-key" placeholder="Enter API Key (sk-...)" />
-            </div>
+
 
             <div id="settings-error" role="alert" aria-live="assertive" class="visually-hidden"
                 style="color: #ff3333; padding: 6px 0;"></div>

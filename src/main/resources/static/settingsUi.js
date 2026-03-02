@@ -23,6 +23,8 @@
         // Voice Activation Settings
         wakewordInput: document.getElementById('wakeword-input'),
         recognitionLangSelect: document.getElementById('recognition-lang'),
+        microphoneSelect: document.getElementById('microphone-select'),
+        refreshMicsBtn: document.getElementById('refresh-mics-btn'),
         voiceDebugToggle: document.getElementById('voice-debug-toggle'),
         geminiKeyGroup: document.getElementById('gemini-key-group'),
         geminiKeyInput: document.getElementById('gemini-key'),
@@ -109,6 +111,61 @@
             if (v.default) opt.selected = true;
             dom.voiceSelect.appendChild(opt);
         });
+    }
+
+    async function loadAndPopulateMicrophones() {
+        if (!dom.microphoneSelect) return;
+
+        try {
+            // Request permission if needed
+            if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+                // First, try to get user permission
+                try {
+                    await navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                        // Stop the stream immediately - we just needed permission
+                        stream.getTracks().forEach(track => track.stop());
+                    });
+                } catch (e) {
+                    console.warn('[Settings] Microphone permission not fully granted, but continuing...');
+                }
+
+                // Now enumerate devices
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputDevices = devices.filter(device => device.kind === 'audioinput');
+
+                console.log('[Settings] Found', audioInputDevices.length, 'microphone(s)');
+
+                // Clear existing options except the first one (Default)
+                dom.microphoneSelect.innerHTML = '<option value="">🎙️ Default (auto-detect)</option>';
+
+                // Add each microphone
+                if (audioInputDevices.length > 0) {
+                    audioInputDevices.forEach((device, index) => {
+                        const opt = document.createElement('option');
+                        opt.value = device.deviceId;
+                        opt.textContent = device.label || `Microphone ${index + 1}`;
+                        dom.microphoneSelect.appendChild(opt);
+                        console.log(`[Settings] Microphone ${index + 1}: ${opt.textContent} (ID: ${device.deviceId})`);
+                    });
+                } else {
+                    console.log('[Settings] No specific microphones found - using system default');
+                }
+            } else {
+                console.error('[Settings] enumerateDevices not supported');
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Not supported in this browser';
+                opt.disabled = true;
+                dom.microphoneSelect.appendChild(opt);
+            }
+        } catch (error) {
+            console.error('[Settings] Error loading microphones:', error);
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = `Error: ${error.name}`;
+            opt.disabled = true;
+            dom.microphoneSelect.appendChild(opt);
+        }
     }
 
     async function fetchModels(provider) {
@@ -252,6 +309,9 @@
         fetchModels(dom.llmSelect ? dom.llmSelect.value : 'mock');
 
         loadVoices().then(populateVoiceSelect).catch(() => populateVoiceSelect([]));
+
+        // Load microphones when settings modal opens
+        loadAndPopulateMicrophones();
     });
 
     if (dom.closeSettingsBtn) dom.closeSettingsBtn.addEventListener('click', hideModal);
@@ -312,6 +372,46 @@
                 window.VoiceActivation.setLanguage(lang);
                 console.log('Speech recognition language set to:', lang);
             }
+        });
+    }
+
+    // Microphone Selection
+    if (dom.microphoneSelect) {
+        dom.microphoneSelect.addEventListener('change', (e) => {
+            const micId = e.target.value;
+            console.log('[Settings] Microphone selected:', micId || 'default');
+
+            // Store in localStorage for persistence
+            if (micId) {
+                localStorage.setItem('jarvis_microphone_id', micId);
+            } else {
+                localStorage.removeItem('jarvis_microphone_id');
+            }
+
+            // If voiceActivation has setMicrophone method, call it
+            if (window.VoiceActivation && typeof window.VoiceActivation.setMicrophone === 'function') {
+                window.VoiceActivation.setMicrophone(micId);
+                console.log('[Settings] Microphone changed in VoiceActivation');
+            }
+        });
+    }
+
+    if (dom.refreshMicsBtn) {
+        dom.refreshMicsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('[Settings] Refreshing microphone list...');
+            dom.refreshMicsBtn.disabled = true;
+            dom.refreshMicsBtn.textContent = '🔄 REFRESHING...';
+
+            loadAndPopulateMicrophones().then(() => {
+                dom.refreshMicsBtn.disabled = false;
+                dom.refreshMicsBtn.textContent = '🔄 REFRESH';
+                console.log('[Settings] Microphone list refreshed');
+            }).catch((error) => {
+                console.error('[Settings] Error refreshing microphones:', error);
+                dom.refreshMicsBtn.disabled = false;
+                dom.refreshMicsBtn.textContent = '🔄 REFRESH';
+            });
         });
     }
 

@@ -24,7 +24,8 @@
         wakeword: 'jarvis',
         language: 'en-US',
         continuous: true,
-        interimResults: true
+        interimResults: true,
+        microphoneId: localStorage.getItem('jarvis_microphone_id') || ''
     };
 
     let finalTranscript = '';
@@ -41,7 +42,7 @@
             recognizer.language = CONFIG.language;
 
             recognizer.onstart = () => {
-                console.log('[VA] Recognition started');
+                console.log('[VA] Recognition started with language:', CONFIG.language);
                 isListening = true;
             };
 
@@ -49,10 +50,20 @@
                 finalTranscript = '';
                 interimTranscript = '';
 
+                console.log('[VA] 📡 onresult event fired - resultIndex:', event.resultIndex, 'total results:', event.results.length);
+
                 // Get all results
                 for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i].transcript;
-                    if (event.results[i].isFinal) {
+                    const result = event.results[i];
+                    const isFinal = result.isFinal;
+
+                    // SpeechRecognitionResult is an array of alternatives
+                    const transcript = result[0] ? result[0].transcript : '';
+                    const confidence = result[0] ? result[0].confidence : 0;
+
+                    console.log('[VA] Result[' + i + '] isFinal=' + isFinal + ' confidence=' + confidence.toFixed(2) + ' transcript="' + transcript + '"');
+
+                    if (isFinal) {
                         finalTranscript += transcript + ' ';
                     } else {
                         interimTranscript += transcript;
@@ -60,12 +71,23 @@
                 }
 
                 const fullTranscript = (finalTranscript + interimTranscript).trim().toLowerCase();
-                console.log('[VA] Heard:', fullTranscript);
+                console.log('[VA] 🎤 FULL TRANSCRIPT: "' + fullTranscript + '"');
+                console.log('[VA] 🌍 LANGUAGE CONFIG: ' + CONFIG.language);
+                console.log('[VA] ✔️ RECOGNIZER LANGUAGE: ' + recognizer.language);
 
                 // Check for wakeword if not processing
                 if (!isProcessing && fullTranscript.includes(CONFIG.wakeword)) {
                     console.log('[VA] ✅ WAKEWORD DETECTED:', fullTranscript);
-                    startRecording();
+                    // Extract command (text after wakeword)
+                    const commandText = fullTranscript.substring(fullTranscript.indexOf(CONFIG.wakeword) + CONFIG.wakeword.length).trim();
+
+                    if (commandText) {
+                        // Send command immediately (same as text input)
+                        sendVoiceCommand(commandText);
+                    } else {
+                        // If only wakeword, start recording for command
+                        startRecording();
+                    }
                 }
 
                 // If processing, show transcript
@@ -75,38 +97,49 @@
             };
 
             recognizer.onerror = (event) => {
-                console.error('[VA] Recognition error:', event.error);
-                
+                console.error('[VA] ❌ Recognition error:', event.error);
+                console.log('[VA] Current language setting:', CONFIG.language);
+
                 if (event.error === 'permission-denied' || event.error === 'not-allowed') {
                     console.error('[VA] ❌ Microphone permission denied');
                     updateStatusText('MICROPHONE BLOCKED - Check browser settings');
                     showMicButton();
+                } else if (event.error === 'network') {
+                    console.error('[VA] Network error - check internet connection');
+                    updateStatusText('NETWORK ERROR - Check internet');
+                } else if (event.error === 'no-speech') {
+                    console.log('[VA] No speech detected - continuing to listen');
                 }
 
                 // Restart listening unless we're processing
                 if (!isProcessing && CONFIG.continuous) {
                     setTimeout(() => {
                         try {
+                            console.log('[VA] Attempting to restart listening after error');
                             recognizer.start();
+                            console.log('[VA] ✅ Listening restarted');
                         } catch (e) {
-                            console.log('[VA] Restart listening:', e.message);
+                            console.error('[VA] Cannot restart listening:', e.message);
                         }
                     }, 1000);
                 }
             };
 
             recognizer.onend = () => {
-                console.log('[VA] Recognition ended');
+                console.log('[VA] Recognition ended - isProcessing:', isProcessing);
                 isListening = false;
                 
                 // Restart if not processing and continuous mode
                 if (!isProcessing && CONFIG.continuous) {
                     setTimeout(() => {
                         try {
+                            console.log('[VA] Attempting to restart listening after onend');
                             recognizer.start();
-                            console.log('[VA] Restarted listening');
+                            console.log('[VA] ✅ Restarted listening');
+                            isListening = true;
                         } catch (e) {
-                            console.log('[VA] Cannot restart:', e.message);
+                            console.error('[VA] Cannot restart - ' + e.name + ':', e.message);
+                            // Will retry after next interval
                         }
                     }, 500);
                 }
@@ -131,16 +164,27 @@
             return;
         }
 
-        console.log('[VA] Requesting microphone permission...');
-        navigator.mediaDevices.getUserMedia({ audio: true })
+        console.log('[VA] Requesting microphone permission with language:', CONFIG.language);
+        console.log('[VA] Using microphone ID:', CONFIG.microphoneId || 'default');
+
+        // Build audio constraints based on selected microphone
+        const audioConstraints = CONFIG.microphoneId
+            ? { deviceId: { exact: CONFIG.microphoneId } }
+            : true;
+
+        navigator.mediaDevices.getUserMedia({ audio: audioConstraints })
             .then((stream) => {
                 // Stop the stream - we only needed permission
                 stream.getTracks().forEach(track => track.stop());
-                console.log('✅ Microphone permission GRANTED');
+                console.log('✅ [VA] Microphone permission GRANTED');
+                console.log('[VA] 🎤 Ready to listen with language:', CONFIG.language);
                 hideMicButton();
                 
                 // Start listening
-                setTimeout(() => startListening(), 100);
+                setTimeout(() => {
+                    console.log('[VA] ▶️ Starting listening mode...');
+                    startListening();
+                }, 100);
             })
             .catch((error) => {
                 console.error('[VA] ❌ Microphone error:', error.name, error.message);
@@ -198,10 +242,17 @@
      * Start listening for wakeword
      */
     function startListening() {
-        if (isListening) return;
+        if (isListening) {
+            console.log('[VA] ⚠️ Already listening, skipping...');
+            return;
+        }
 
         try {
-            console.log('[VA] 🎤 Starting to listen for "' + CONFIG.wakeword.toUpperCase() + '"');
+            console.log('[VA] ▶️ Starting to listen for "' + CONFIG.wakeword.toUpperCase() + '"');
+            console.log('[VA] 🌍 Language: ' + CONFIG.language);
+            console.log('[VA] 🎙️ Recognizer language:', recognizer.language);
+            console.log('[VA] Continuous mode:', CONFIG.continuous);
+
             isListening = true;
             isProcessing = false;
             finalTranscript = '';
@@ -209,14 +260,48 @@
             
             updateStatusText('LISTENING FOR: "JARVIS"');
             recognizer.start();
+            console.log('[VA] ✅ recognizer.start() called');
         } catch (e) {
-            console.error('[VA] Error starting listening:', e.message);
+            console.error('[VA] ❌ Error starting listening:', e.message);
+            console.error('[VA] Stack:', e.stack);
             isListening = false;
         }
     }
 
     /**
-     * Start recording mode (after wakeword detected)
+     * Send voice command to server (same as text input)
+     */
+    function sendVoiceCommand(command) {
+        console.log('[VA] 📤 Sending voice command to server:', command);
+
+        // Log to chat (same as app.js does)
+        if (window.logMessage) {
+            window.logMessage('USER (Voice)', command);
+        }
+
+        // Send via WebSocket (same as app.js text input)
+        if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+            window.ws.send(command);
+
+            // Start thinking animation (same as app.js)
+            if (window.startThinking) {
+                window.startThinking();
+            }
+
+            console.log('[VA] ✅ Command sent to server');
+        } else {
+            console.error('[VA] ❌ WebSocket not connected');
+        }
+
+        // Restart listening for next command
+        setTimeout(() => {
+            isListening = false;
+            startListening();
+        }, 500);
+    }
+
+    /**
+     * Start recording mode (after wakeword detected with no command)
      */
     function startRecording() {
         isProcessing = true;
@@ -242,7 +327,7 @@
     }
 
     /**
-     * Stop recording and send to JARVIS
+     * Stop recording mode and send command to server
      */
     function stopRecording() {
         isProcessing = false;
@@ -260,31 +345,15 @@
         // Send command if we have text
         if (finalTranscript.trim()) {
             const command = finalTranscript.trim();
-            console.log('[VA] 📤 Sending to JARVIS:', command);
-            
-            // Log to chat
-            if (window.logMessage) {
-                window.logMessage('USER (Voice)', command);
-            }
-
-            // Send via WebSocket
-            if (window.ws && window.ws.readyState === WebSocket.OPEN) {
-                window.ws.send(command);
-                
-                // Start thinking
-                if (window.startThinking) {
-                    window.startThinking();
-                }
-            } else {
-                console.error('[VA] WebSocket not connected');
-            }
+            sendVoiceCommand(command);
+        } else {
+            console.log('[VA] ⚠️ No command captured, resuming listening');
+            // Resume listening after a moment
+            setTimeout(() => {
+                isListening = false;
+                startListening();
+            }, 500);
         }
-
-        // Resume listening after a moment
-        setTimeout(() => {
-            isListening = false;
-            startListening();
-        }, 500);
     }
 
     /**
@@ -319,8 +388,31 @@
             if (recognizer) recognizer.stop();
         },
         requestPermission: requestMicrophoneAndStart,
-        setWakeword: (word) => { CONFIG.wakeword = word.toLowerCase(); },
-        setLanguage: (lang) => { CONFIG.language = lang; if (recognizer) recognizer.language = lang; },
+        setWakeword: (word) => {
+            CONFIG.wakeword = word.toLowerCase();
+            console.log('[VA] Wakeword changed to:', CONFIG.wakeword);
+        },
+        setLanguage: (lang) => {
+            CONFIG.language = lang;
+            if (recognizer) recognizer.language = lang;
+            console.log('[VA] Language changed to:', CONFIG.language);
+        },
+        setMicrophone: (micId) => {
+            CONFIG.microphoneId = micId || '';
+            if (micId) {
+                localStorage.setItem('jarvis_microphone_id', micId);
+            } else {
+                localStorage.removeItem('jarvis_microphone_id');
+            }
+            console.log('[VA] Microphone changed to:', micId || 'default');
+
+            // Restart listening with new microphone
+            if (isListening) {
+                console.log('[VA] Restarting listening with new microphone...');
+                if (recognizer) recognizer.stop();
+                setTimeout(() => startListening(), 500);
+            }
+        },
         toggleDebug: () => { console.log('[VA] Debug mode'); },
         isListening: () => isListening,
         getConfig: () => ({ ...CONFIG })
@@ -329,21 +421,23 @@
     // Auto-init when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('[VA] DOMContentLoaded - initializing');
+            console.log('[VA] DOMContentLoaded - initializing with language:', CONFIG.language);
             setTimeout(() => {
                 initializeVoiceActivation();
                 
                 // Try to start listening after a delay
                 setTimeout(() => {
+                    console.log('[VA] Starting listening with language:', CONFIG.language);
                     requestMicrophoneAndStart();
                 }, 500);
             }, 100);
         });
     } else {
-        console.log('[VA] DOM already loaded - initializing');
+        console.log('[VA] DOM already loaded - initializing with language:', CONFIG.language);
         setTimeout(() => {
             initializeVoiceActivation();
             setTimeout(() => {
+                console.log('[VA] Starting listening with language:', CONFIG.language);
                 requestMicrophoneAndStart();
             }, 500);
         }, 100);

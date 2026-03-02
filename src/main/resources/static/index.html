@@ -103,6 +103,13 @@
                         </select>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="microphone-select" style="min-width: 80px; font-size: 12px;">🎙️ Microphone:</label>
+                        <select id="microphone-select" style="flex: 1; padding: 5px; background: #1a1a1a; color: #0ff; border: 1px solid #0ff;">
+                            <option value="">Default (auto-detect)</option>
+                        </select>
+                        <button id="refresh-mics-btn" class="secondary" type="button" style="padding: 5px 12px; font-size: 11px; white-space: nowrap;">🔄 REFRESH</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
                         <input type="checkbox" id="voice-debug-toggle" style="cursor: pointer;"/>
                         <label for="voice-debug-toggle" style="font-size: 12px; cursor: pointer;">🔍 Debug Mode (show partial results)</label>
                     </div>
