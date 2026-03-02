@@ -36,14 +36,28 @@
      */
     function loadSavedPreferences() {
         try {
-            if (window.SettingsState && window.SettingsState.loadPreferences) {
-                const prefs = window.SettingsState.loadPreferences();
-                if (prefs) {
-                    if (prefs.wakeword) CONFIG.wakeword = prefs.wakeword;
-                    if (prefs.language) CONFIG.language = prefs.language;
-                    if (prefs.microphoneId) CONFIG.microphoneId = prefs.microphoneId;
-                    console.log('[VA] 📦 Loaded preferences from localStorage:', { wakeword: CONFIG.wakeword, language: CONFIG.language, microphoneId: CONFIG.microphoneId });
-                }
+            if (!window.SettingsState) {
+                console.warn('[VA] SettingsState not available');
+                return;
+            }
+
+            // Try to load COMPLETE settings first (new method)
+            const completeSettings = window.SettingsState.loadCompleteSettings();
+            if (completeSettings) {
+                if (completeSettings.wakeword) CONFIG.wakeword = completeSettings.wakeword;
+                if (completeSettings.language) CONFIG.language = completeSettings.language;
+                if (completeSettings.microphoneId) CONFIG.microphoneId = completeSettings.microphoneId;
+                console.log('[VA] ✅ Loaded COMPLETE preferences from localStorage:', { wakeword: CONFIG.wakeword, language: CONFIG.language, microphoneId: CONFIG.microphoneId });
+                return;
+            }
+
+            // Fallback: Load old format (backward compatibility)
+            const prefs = window.SettingsState.loadPreferences();
+            if (prefs) {
+                if (prefs.wakeword) CONFIG.wakeword = prefs.wakeword;
+                if (prefs.language) CONFIG.language = prefs.language;
+                if (prefs.microphoneId) CONFIG.microphoneId = prefs.microphoneId;
+                console.log('[VA] 📦 Loaded preferences from localStorage (old format):', { wakeword: CONFIG.wakeword, language: CONFIG.language, microphoneId: CONFIG.microphoneId });
             }
         } catch (e) {
             console.error('[VA] Error loading saved preferences:', e.message);

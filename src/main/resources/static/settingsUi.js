@@ -50,56 +50,80 @@
      * Restore settings from localStorage when modal opens
      */
     function restoreSettings() {
-        if (!window.SettingsState) return;
-
-        const prefs = window.SettingsState.loadPreferences();
-        if (!prefs) {
-            console.log('[SettingsUi] No saved preferences found');
+        if (!window.SettingsState) {
+            console.warn('[SettingsUi] SettingsState not available');
             return;
         }
 
-        console.log('[SettingsUi] Restoring preferences from localStorage:', prefs);
-
-        // Restore voice activation settings
-        if (prefs.wakeword && dom.wakewordInput) {
-            dom.wakewordInput.value = prefs.wakeword;
-        }
-        if (prefs.language && dom.recognitionLangSelect) {
-            dom.recognitionLangSelect.value = prefs.language;
-        }
-        if (prefs.microphoneId && dom.microphoneSelect) {
-            dom.microphoneSelect.value = prefs.microphoneId;
-        }
-        if (prefs.voiceId && dom.voiceSelect) {
-            dom.voiceSelect.value = prefs.voiceId;
+        // ✅ Load COMPLETE settings from localStorage
+        const savedSettings = window.SettingsState.loadCompleteSettings();
+        if (!savedSettings) {
+            console.log('[SettingsUi] No saved settings found in localStorage');
+            return;
         }
 
-        // Restore voice parameters from localStorage
-        const savedParams = window.SettingsState.loadVoiceParams();
-        if (savedParams) {
-            if (savedParams.rate !== undefined && dom.voiceRateInput) {
-                dom.voiceRateInput.value = savedParams.rate;
-                if (dom.voiceRateValue) dom.voiceRateValue.innerText = savedParams.rate.toFixed(2) + 'x';
-                window.voiceParams = window.voiceParams || {};
-                window.voiceParams.rate = savedParams.rate;
-            }
-            if (savedParams.pitch !== undefined && dom.voicePitchInput) {
-                dom.voicePitchInput.value = savedParams.pitch;
-                if (dom.voicePitchValue) dom.voicePitchValue.innerText = savedParams.pitch.toFixed(2) + 'x';
-                window.voiceParams = window.voiceParams || {};
-                window.voiceParams.pitch = savedParams.pitch;
-            }
-            if (savedParams.volume !== undefined && dom.voiceVolumeInput) {
-                dom.voiceVolumeInput.value = savedParams.volume;
-                if (dom.voiceVolumeValue) dom.voiceVolumeValue.innerText = savedParams.volume.toFixed(2);
-                window.voiceParams = window.voiceParams || {};
-                window.voiceParams.volume = savedParams.volume;
-            }
+        console.log('[SettingsUi] ✅ Restoring ALL settings from localStorage:', savedSettings);
+
+        // Restore LLM & Model Settings
+        if (savedSettings.llm && dom.llmSelect) {
+            dom.llmSelect.value = savedSettings.llm;
+        }
+        if (savedSettings.model && dom.modelSelect) {
+            dom.modelSelect.value = savedSettings.model;
+        }
+        if (savedSettings.tts && dom.ttsSelect) {
+            dom.ttsSelect.value = savedSettings.tts;
+        }
+        if (savedSettings.geminiKey && dom.geminiKeyInput) {
+            dom.geminiKeyInput.value = savedSettings.geminiKey;
         }
 
-        // Note: llm, tts, model come from server config, not localStorage
-        // But we can highlight which ones were selected before
-        console.log('[SettingsUi] Preferences restored. Voice settings:', prefs);
+        // Restore Voice Activation Settings
+        if (savedSettings.wakeword && dom.wakewordInput) {
+            dom.wakewordInput.value = savedSettings.wakeword;
+        }
+        if (savedSettings.language && dom.recognitionLangSelect) {
+            dom.recognitionLangSelect.value = savedSettings.language;
+        }
+        if (savedSettings.microphoneId && dom.microphoneSelect) {
+            dom.microphoneSelect.value = savedSettings.microphoneId;
+        }
+
+        // Restore Voice Selection & Parameters
+        if (savedSettings.voiceId && dom.voiceSelect) {
+            dom.voiceSelect.value = savedSettings.voiceId;
+        }
+        if (savedSettings.voiceRate !== undefined && dom.voiceRateInput) {
+            dom.voiceRateInput.value = savedSettings.voiceRate;
+            if (dom.voiceRateValue) {
+                dom.voiceRateValue.innerText = savedSettings.voiceRate.toFixed(2) + 'x';
+            }
+            window.voiceParams = window.voiceParams || {};
+            window.voiceParams.rate = savedSettings.voiceRate;
+        }
+        if (savedSettings.voicePitch !== undefined && dom.voicePitchInput) {
+            dom.voicePitchInput.value = savedSettings.voicePitch;
+            if (dom.voicePitchValue) {
+                dom.voicePitchValue.innerText = savedSettings.voicePitch.toFixed(2) + 'x';
+            }
+            window.voiceParams = window.voiceParams || {};
+            window.voiceParams.pitch = savedSettings.voicePitch;
+        }
+        if (savedSettings.voiceVolume !== undefined && dom.voiceVolumeInput) {
+            dom.voiceVolumeInput.value = savedSettings.voiceVolume;
+            if (dom.voiceVolumeValue) {
+                dom.voiceVolumeValue.innerText = savedSettings.voiceVolume.toFixed(2);
+            }
+            window.voiceParams = window.voiceParams || {};
+            window.voiceParams.volume = savedSettings.voiceVolume;
+        }
+
+        // Restore Debug Settings
+        if (savedSettings.voiceDebug !== undefined && dom.voiceDebugToggle) {
+            dom.voiceDebugToggle.checked = savedSettings.voiceDebug;
+        }
+
+        console.log('[SettingsUi] ✅ ALL settings restored successfully');
     }
 
 
@@ -347,33 +371,54 @@
             const newConfig = await window.SettingsService.saveConfig(payload);
             window.SettingsState.setConfig(newConfig);
 
-            // Save voice activation preferences to LocalStorage
-            const voicePrefs = {
+            // ✅ COMPLETE SETTINGS OBJECT - Save ALL settings
+            const completeSettings = {
+                // LLM & Model Settings
+                llm: dom.llmSelect ? dom.llmSelect.value : 'mock',
+                model: dom.modelSelect ? dom.modelSelect.value : '',
+                tts: dom.ttsSelect ? dom.ttsSelect.value : 'mock',
+                geminiKey: (dom.geminiKeyInput && dom.geminiKeyInput.value.trim()) ? dom.geminiKeyInput.value.trim() : '',
+
+                // Voice Activation Settings
                 wakeword: dom.wakewordInput ? dom.wakewordInput.value.trim().toLowerCase() : 'jarvis',
                 language: dom.recognitionLangSelect ? dom.recognitionLangSelect.value : 'en-US',
                 microphoneId: dom.microphoneSelect ? dom.microphoneSelect.value : '',
+
+                // Voice Selection & Parameters
                 voiceId: dom.voiceSelect ? dom.voiceSelect.value : '',
-                llm: payload.llm,
-                tts: payload.tts,
-                model: payload.model,
-                geminiKey: payload.geminiKey || ''
+                voiceRate: dom.voiceRateInput ? parseFloat(dom.voiceRateInput.value) : 0.85,
+                voicePitch: dom.voicePitchInput ? parseFloat(dom.voicePitchInput.value) : 1.1,
+                voiceVolume: dom.voiceVolumeInput ? parseFloat(dom.voiceVolumeInput.value) : 0.9,
+
+                // Debug Settings
+                voiceDebug: dom.voiceDebugToggle ? dom.voiceDebugToggle.checked : false,
+
+                // Timestamp & Version
+                savedAt: new Date().toISOString(),
+                version: '2.0' // For future migration
             };
 
-            // Save to localStorage using SettingsState
-            if (window.SettingsState && window.SettingsState.savePreferences) {
-                window.SettingsState.savePreferences(voicePrefs);
+            // Save ALL settings to localStorage using SettingsState
+            if (window.SettingsState && window.SettingsState.saveCompleteSettings) {
+                window.SettingsState.saveCompleteSettings(completeSettings);
+                console.log('[SettingsUi] ✅ ALL settings saved to localStorage:', completeSettings);
+            } else {
+                console.error('[SettingsUi] ❌ saveCompleteSettings not available');
             }
 
-            // Save voice parameters separately
+            // Also save voice parameters separately for backward compatibility
             if (window.voiceParams && window.SettingsState && window.SettingsState.saveVoiceParams) {
                 window.SettingsState.saveVoiceParams(window.voiceParams);
             }
 
             hideModal();
             // logMessage is global in app.js
-            if (window.logMessage) window.logMessage('SYS', `Configuration Updated. LLM: ${newConfig.llm.toUpperCase()}`);
+            if (window.logMessage) {
+                window.logMessage('SYS', `✅ Configuration saved. LLM: ${newConfig.llm.toUpperCase()}`);
+            }
         } catch (e) {
             showError('Failed to save configuration. ' + (e && e.details ? e.details : ''));
+            console.error('[SettingsUi] Save error:', e);
         } finally {
             dom.saveSettingsBtn.disabled = false;
             if (dom.saveSpinner) dom.saveSpinner.classList.add('visually-hidden');

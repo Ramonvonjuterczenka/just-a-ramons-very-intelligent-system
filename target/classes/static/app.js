@@ -20,21 +20,45 @@ window.voiceParams = {
 };
 
 /**
- * Load voice parameters from localStorage at startup
+ * Load ALL settings from localStorage at startup
  */
-function loadVoiceParamsFromStorage() {
+function loadAllSettingsFromStorage() {
     try {
-        if (window.SettingsState && window.SettingsState.loadVoiceParams) {
-            const savedParams = window.SettingsState.loadVoiceParams();
-            if (savedParams) {
-                window.voiceParams.rate = savedParams.rate !== undefined ? savedParams.rate : 0.85;
-                window.voiceParams.pitch = savedParams.pitch !== undefined ? savedParams.pitch : 1.1;
-                window.voiceParams.volume = savedParams.volume !== undefined ? savedParams.volume : 0.9;
-                console.log('[APP] ✅ Voice parameters loaded from storage:', window.voiceParams);
+        if (!window.SettingsState) {
+            console.warn('[APP] SettingsState not available yet');
+            return;
+        }
+
+        // Try to load complete settings first (new method)
+        const completeSettings = window.SettingsState.loadCompleteSettings();
+        if (completeSettings) {
+            console.log('[APP] ✅ Complete settings loaded from storage');
+
+            // Apply voice parameters
+            if (completeSettings.voiceRate !== undefined) {
+                window.voiceParams.rate = completeSettings.voiceRate;
             }
+            if (completeSettings.voicePitch !== undefined) {
+                window.voiceParams.pitch = completeSettings.voicePitch;
+            }
+            if (completeSettings.voiceVolume !== undefined) {
+                window.voiceParams.volume = completeSettings.voiceVolume;
+            }
+
+            console.log('[APP] ✅ Voice parameters applied:', window.voiceParams);
+            return;
+        }
+
+        // Fallback: Load old format (for backward compatibility)
+        const savedParams = window.SettingsState.loadVoiceParams();
+        if (savedParams) {
+            window.voiceParams.rate = savedParams.rate !== undefined ? savedParams.rate : 0.85;
+            window.voiceParams.pitch = savedParams.pitch !== undefined ? savedParams.pitch : 1.1;
+            window.voiceParams.volume = savedParams.volume !== undefined ? savedParams.volume : 0.9;
+            console.log('[APP] ✅ Voice parameters loaded (old format):', window.voiceParams);
         }
     } catch (e) {
-        console.error('[APP] Error loading voice params from storage:', e.message);
+        console.error('[APP] Error loading settings from storage:', e.message);
     }
 }
 
@@ -313,8 +337,8 @@ function speakText(text) {
 window.addEventListener('DOMContentLoaded', () => {
     console.log('[APP] DOMContentLoaded fired - initializing JARVIS...');
 
-    // Load voice parameters from localStorage
-    loadVoiceParamsFromStorage();
+    // Load ALL settings from localStorage (voice params + other settings)
+    loadAllSettingsFromStorage();
 
     connectWebSocket();
     fetchConfig();

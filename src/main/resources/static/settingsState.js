@@ -10,6 +10,7 @@
 
     const STORAGE_KEY = 'jarvis_user_preferences';
     const VOICE_PARAMS_KEY = 'jarvis_voice_params';
+    const COMPLETE_SETTINGS_KEY = 'jarvis_complete_settings';  // ← For all settings
 
     function on(evt, cb) {
         listeners[evt] = listeners[evt] || new Set();
@@ -101,10 +102,44 @@
         try {
             localStorage.removeItem(STORAGE_KEY);
             localStorage.removeItem(VOICE_PARAMS_KEY);
+            localStorage.removeItem(COMPLETE_SETTINGS_KEY);
             console.log('[SettingsState] ✅ All preferences cleared');
         } catch (e) {
             console.error('[SettingsState] ❌ Failed to clear preferences:', e.message);
         }
+    }
+
+    /**
+     * Save ALL settings (complete settings object) to LocalStorage
+     * This is the primary method for saving all user preferences
+     */
+    function saveCompleteSettings(completeSettings) {
+        try {
+            localStorage.setItem(COMPLETE_SETTINGS_KEY, JSON.stringify(completeSettings));
+            console.log('[SettingsState] ✅ Complete settings saved to LocalStorage:', completeSettings);
+            return true;
+        } catch (e) {
+            console.error('[SettingsState] ❌ Failed to save complete settings:', e.message);
+            return false;
+        }
+    }
+
+    /**
+     * Load ALL settings from LocalStorage
+     * This is the primary method for loading all user preferences
+     */
+    function loadCompleteSettings() {
+        try {
+            const saved = localStorage.getItem(COMPLETE_SETTINGS_KEY);
+            if (saved) {
+                const settings = JSON.parse(saved);
+                console.log('[SettingsState] ✅ Complete settings loaded from LocalStorage:', settings);
+                return settings;
+            }
+        } catch (e) {
+            console.error('[SettingsState] ❌ Failed to load complete settings:', e.message);
+        }
+        return null;
     }
 
     window.SettingsState = {
@@ -117,7 +152,9 @@
         loadPreferences,
         saveVoiceParams,
         loadVoiceParams,
-        clearPreferences
+        clearPreferences,
+        saveCompleteSettings,  // ← NEW
+        loadCompleteSettings   // ← NEW
     };
 })();
 

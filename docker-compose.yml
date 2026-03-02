@@ -12,7 +12,7 @@ services:
       - ollama_data:/root/.ollama
     environment:
       # Use Mistral as default model (better quality, still lightweight)
-      - OLLAMA_DEFAULT_MODEL=mistral
+      - OLLAMA_DEFAULT_MODEL=Qwen2.5:3b
     restart: unless-stopped
 
   jarvis-server:
