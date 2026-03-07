@@ -333,6 +333,9 @@
 
         // Ensure WebSocket is connected before sending
         if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+            if (window.stopCurrentSpeech) {
+                window.stopCurrentSpeech();
+            }
             window.ws.send(command);
             if (window.startThinking) {
                 window.startThinking();
@@ -377,6 +380,9 @@
 
                 if (window.ws && window.ws.readyState === WebSocket.OPEN) {
                     console.log('[VA] 📨 WebSocket connected! Sending command now...');
+                    if (window.stopCurrentSpeech) {
+                        window.stopCurrentSpeech();
+                    }
                     window.ws.send(command);
                     if (window.startThinking) {
                         window.startThinking();

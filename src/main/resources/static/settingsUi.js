@@ -28,6 +28,8 @@
         voiceDebugToggle: document.getElementById('voice-debug-toggle'),
         geminiKeyGroup: document.getElementById('gemini-key-group'),
         geminiKeyInput: document.getElementById('gemini-key'),
+        localAiUrlGroup: document.getElementById('localai-url-group'),
+        localAiUrlInput: document.getElementById('localai-url'),
         testConnBtn: document.getElementById('test-conn-btn'),
         testConnResult: document.getElementById('test-conn-result'),
         settingsError: document.getElementById('settings-error') || null,
@@ -76,6 +78,9 @@
         }
         if (savedSettings.geminiKey && dom.geminiKeyInput) {
             dom.geminiKeyInput.value = savedSettings.geminiKey;
+        }
+        if (savedSettings.localAiUrl && dom.localAiUrlInput) {
+            dom.localAiUrlInput.value = savedSettings.localAiUrl;
         }
 
         // Restore Voice Activation Settings
@@ -129,10 +134,12 @@
 
     function updateGeminiKeyVisibility() {
         if (!dom.llmSelect) return;
-        if (dom.llmSelect.value === 'gemini') {
-            dom.geminiKeyGroup.style.display = 'flex';
-        } else {
-            dom.geminiKeyGroup.style.display = 'none';
+
+        if (dom.geminiKeyGroup) {
+            dom.geminiKeyGroup.style.display = dom.llmSelect.value === 'gemini' ? 'flex' : 'none';
+        }
+        if (dom.localAiUrlGroup) {
+            dom.localAiUrlGroup.style.display = dom.llmSelect.value === 'localai' ? 'flex' : 'none';
         }
     }
 
@@ -351,6 +358,13 @@
             }
         }
 
+        if (dom.llmSelect && dom.llmSelect.value === 'localai') {
+            if (!dom.localAiUrlInput || !dom.localAiUrlInput.value.trim()) {
+                showError('LocalAI URL is required for LocalAI provider.');
+                return;
+            }
+        }
+
         const payload = {
             llm: dom.llmSelect ? dom.llmSelect.value : undefined,
             tts: dom.ttsSelect ? dom.ttsSelect.value : undefined,
@@ -358,6 +372,9 @@
         };
         if (dom.llmSelect && dom.llmSelect.value === 'gemini' && dom.geminiKeyInput && dom.geminiKeyInput.value.trim()) {
             payload.geminiKey = dom.geminiKeyInput.value.trim();
+        }
+        if (dom.llmSelect && dom.llmSelect.value === 'localai' && dom.localAiUrlInput && dom.localAiUrlInput.value.trim()) {
+            payload.localAiUrl = dom.localAiUrlInput.value.trim();
         }
         if (dom.ttsSelect && dom.ttsSelect.value === 'browser' && dom.voiceSelect && dom.voiceSelect.value) {
             payload.voiceId = dom.voiceSelect.value;
@@ -378,6 +395,7 @@
                 model: dom.modelSelect ? dom.modelSelect.value : '',
                 tts: dom.ttsSelect ? dom.ttsSelect.value : 'mock',
                 geminiKey: (dom.geminiKeyInput && dom.geminiKeyInput.value.trim()) ? dom.geminiKeyInput.value.trim() : '',
+                localAiUrl: (dom.localAiUrlInput && dom.localAiUrlInput.value.trim()) ? dom.localAiUrlInput.value.trim() : '',
 
                 // Voice Activation Settings
                 wakeword: dom.wakewordInput ? dom.wakewordInput.value.trim().toLowerCase() : 'jarvis',
@@ -576,6 +594,7 @@ if (dom.testConnBtn) dom.testConnBtn.addEventListener('click', testConnection);
             if (dom.ttsSelect && cfg.tts) dom.ttsSelect.value = cfg.tts;
             if (dom.modelSelect && cfg.model) dom.modelSelect.value = cfg.model;
             if (dom.voiceSelect && cfg.voiceId) dom.voiceSelect.value = cfg.voiceId;
+            if (dom.localAiUrlInput && cfg.localAiUrl) dom.localAiUrlInput.value = cfg.localAiUrl;
             updateGeminiKeyVisibility();
             updateVoiceVisibility();
         });

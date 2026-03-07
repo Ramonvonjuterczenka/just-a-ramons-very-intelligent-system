@@ -55,6 +55,7 @@
                 <select id="llm-select">
                     <option value="mock">MOCK (Local Testing)</option>
                     <option value="ollama">OLLAMA (Local AI)</option>
+                    <option value="localai">LOCALAI (OpenAI-compatible Local)</option>
                     <option value="gemini">GEMINI (Cloud AI)</option>
                 </select>
             </div>
@@ -62,6 +63,11 @@
             <div class="form-group" id="gemini-key-group">
                 <label for="gemini-key">Google Gemini API Key:</label>
                 <input type="password" id="gemini-key" placeholder="Enter API Key (sk-...)" />
+            </div>
+
+            <div class="form-group" id="localai-url-group" style="display: none;">
+                <label for="localai-url">LocalAI URL:</label>
+                <input type="url" id="localai-url" placeholder="http://localhost:8080" />
             </div>
 
             <div class="form-group">
@@ -175,3 +181,4 @@
 </body>
 
 </html>
+

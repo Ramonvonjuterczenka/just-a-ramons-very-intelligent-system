@@ -11,6 +11,10 @@ jarvis:
     url: ${JARVIS_OLLAMA_URL:http://ollama:11434}
     model: ${JARVIS_OLLAMA_MODEL:mistral}
 
+  localai:
+    url: ${JARVIS_LOCALAI_URL:http://localhost:8080}
+    model: ${JARVIS_LOCALAI_MODEL:gpt-4o-mini}
+
   # Coqui TTS Configuration (High-quality Open Source TTS)
   coqui:
     enabled: ${JARVIS_COQUI_ENABLED:true}
@@ -26,3 +30,4 @@ jarvis:
 
   system:
     prompt: ${JARVIS_SYSTEM_PROMPT:Du bist JARVIS, ein hochintelligenter, charmanter und leicht sarkastischer KI-Assistent. Du wurdest von Ramon erschaffen. Du sprichst immer Deutsch. Antworte immer konkret und zielgerichtet, es sei denn, du wirst nach Details gefragt. Beziehe dich bei Bedarf auf 'Sir' oder 'Boss'.}
+

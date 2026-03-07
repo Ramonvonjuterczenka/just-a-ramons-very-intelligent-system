@@ -1,14 +1,14 @@
 package com.jarvis.controller;
 
+import com.jarvis.provider.LlmProvider;
+import com.jarvis.provider.impl.GeminiLlmProvider;
+import com.jarvis.provider.impl.LocalAiLlmProvider;
+import com.jarvis.service.ProviderManager;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.jarvis.service.ProviderManager;
-import com.jarvis.provider.impl.GeminiLlmProvider;
-import com.jarvis.provider.LlmProvider;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +30,12 @@ public class ConfigController {
         config.put("tts", providerManager.getActiveTts());
         config.put("llm", providerManager.getActiveLlm());
         config.put("model", providerManager.getActiveLlmProvider().getActiveModel());
+
+        LlmProvider localAi = providerManager.getLlmProvider("localai");
+        if (localAi instanceof LocalAiLlmProvider) {
+            config.put("localAiUrl", ((LocalAiLlmProvider) localAi).getBaseUrl());
+        }
+
         config.put("status", "System Online");
         return config;
     }
@@ -50,11 +56,17 @@ public class ConfigController {
             providerManager.getActiveLlmProvider().setModel(updates.get("model"));
         }
 
-        // Dynamically update API Keys if provided (e.g., for Gemini)
         if (updates.containsKey("geminiKey")) {
             LlmProvider gemini = providerManager.getLlmProvider("gemini");
             if (gemini instanceof GeminiLlmProvider) {
                 ((GeminiLlmProvider) gemini).setApiKey(updates.get("geminiKey"));
+            }
+        }
+
+        if (updates.containsKey("localAiUrl")) {
+            LlmProvider localAi = providerManager.getLlmProvider("localai");
+            if (localAi instanceof LocalAiLlmProvider) {
+                ((LocalAiLlmProvider) localAi).setBaseUrl(updates.get("localAiUrl"));
             }
         }
 
@@ -75,8 +87,10 @@ public class ConfigController {
             @org.springframework.web.bind.annotation.RequestParam(required = false) String provider) {
         LlmProvider llm = provider != null ? providerManager.getLlmProvider(provider)
                 : providerManager.getActiveLlmProvider();
-        if (llm == null)
+        if (llm == null) {
             llm = providerManager.getActiveLlmProvider();
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put("activeProvider", llm.getProviderName());
         response.put("activeModel", llm.getActiveModel());
@@ -84,3 +98,4 @@ public class ConfigController {
         return response;
     }
 }
+

@@ -1,5 +1,6 @@
 let ws;
 let isRecording = false;
+let activeAudio = null;
 const micBtn = document.getElementById('mic-btn');
 const arcReactor = document.querySelector('.arc-reactor');
 const statusText = document.getElementById('status-text');
@@ -179,6 +180,28 @@ function simulateAudioPlayback() {
     }, 2000); // simulate 2s playback
 }
 
+function stopCurrentSpeech() {
+    // Stop browser TTS immediately
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+    }
+
+    // Stop currently playing audio (WAV/MP3) if present
+    if (activeAudio) {
+        try {
+            activeAudio.pause();
+            activeAudio.currentTime = 0;
+            activeAudio.src = '';
+        } catch (e) {
+            console.warn('Could not stop active audio cleanly', e);
+        }
+        activeAudio = null;
+    }
+
+    arcReactor.classList.remove('active');
+    statusText.innerText = 'SYSTEM ONLINE';
+}
+
 // Play real audio data (WAV, MP3, etc.) from high-quality TTS providers
 function playAudioData(audioBuffer) {
     try {
@@ -189,6 +212,7 @@ function playAudioData(audioBuffer) {
         // Create and play audio element
         const audio = new Audio();
         audio.src = audioUrl;
+        activeAudio = audio;
 
         audio.onplay = () => {
             arcReactor.classList.add('active');
@@ -199,12 +223,15 @@ function playAudioData(audioBuffer) {
             arcReactor.classList.remove('active');
             statusText.innerText = 'SYSTEM ONLINE';
             URL.revokeObjectURL(audioUrl);  // Cleanup
+            activeAudio = null;
         };
 
         audio.onerror = (e) => {
             console.error("Audio playback error:", e);
             arcReactor.classList.remove('active');
             statusText.innerText = 'SYSTEM ONLINE';
+            URL.revokeObjectURL(audioUrl);
+            activeAudio = null;
         };
 
         audio.play();
@@ -219,6 +246,7 @@ function playAudioData(audioBuffer) {
 sendBtn.addEventListener('click', () => {
     const text = textInput.value.trim();
     if (text && window.ws && window.ws.readyState === WebSocket.OPEN) {
+        stopCurrentSpeech();
         logMessage('USER', text);
         window.ws.send(text);
         textInput.value = '';
@@ -274,8 +302,8 @@ function stopRecordingMode() {
 // Web Speech API - Voice loading with JARVIS-style parameters
 function speakText(text) {
     if ('speechSynthesis' in window) {
-        // Cancel any ongoing speech
-        window.speechSynthesis.cancel();
+        // Stop any ongoing speech/audio before speaking new text
+        stopCurrentSpeech();
 
         const utterance = new SpeechSynthesisUtterance(text);
 
@@ -333,6 +361,9 @@ function speakText(text) {
     }
 }
 
+// Expose for other modules (e.g. voiceActivation.js)
+window.stopCurrentSpeech = stopCurrentSpeech;
+
 // Init
 window.addEventListener('DOMContentLoaded', () => {
     console.log('[APP] DOMContentLoaded fired - initializing JARVIS...');
@@ -355,3 +386,4 @@ window.addEventListener('DOMContentLoaded', () => {
         console.log('[APP] JARVIS application ready');
     }, 500);
 });
+
